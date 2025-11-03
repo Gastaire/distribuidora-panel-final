@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Administración</title>
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#3b82f6" />
+    <link rel="apple-touch-icon" href="https://placehold.co/192x192/3b82f6/white?text=D" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="DistriMaxi" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js"></script>
+    <script src="https://unpkg.com/jspdf-autotable@latest/dist/jspdf.plugin.autotable.js"></script>
+    <script type="text/babel" src="services/api.js"></script>
+    <script type="text/babel" src="components/ui/Icons.js"></script>
+    <script type="text/babel" src="components/ui/Common.js"></script>
+    <script type="text/babel" src="components/ui/Modal.js"></script>
+    <script type="text/babel" src="hooks/useSortableData.js"></script>
+    <script type="text/babel" src="views/ActividadView.js"></script>
+    <script type="text/babel" src="views/UsuariosView.js"></script>
+    <script type="text/babel" src="views/ClientesView.js"></script>
+    <script type="text/babel" src="components/forms/ClienteFormModal.js"></script>
+    <script type="text/babel" src="components/forms/UsuarioFormModal.js"></script>
+    <script type="text/babel" src="components/ui/CategoryCombobox.js"></script>
+    <script type="text/babel" src="components/forms/ProductoFormModal.js"></script>
+    <script type="text/babel" src="views/ProductosView.js"></script>
+    <script type="text/babel" src="views/PedidosView.js"></script>
+    <script type="text/babel" src="views/DashboardView.js"></script>
+    <script type="text/babel" src="views/AnalyticsView.js"></script>
+    <script type="text/babel" src="views/CategoriasView.js"></script>
+    <script type="text/babel" src="views/DataIntegrityView.js"></script>
+    <!-- Punto de Entrada Principal de la App -->
+    <script type="text/babel" src="app.js"></script>
+    <style>
+        @media print {
+            /* --- CORREGIDO: Ocultar todo lo que no se va a imprimir --- */
+            body * {
+                visibility: hidden;
+            }
+            .printable-area, .printable-area * {
+                visibility: visible;
+            }
+            .printable-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                height: 100%;
+                font-size: 10pt; /* --- CORREGIDO: Reducir un poco el tamaño de fuente general --- */
+                display: flex;
+                flex-direction: column;
+            }
+            .printable-area .print-body {
+                flex-grow: 1;
+            }
+            .printable-area .print-footer {
+                flex-shrink: 0;
+                margin-top: auto;
+            }
+            
+            /* --- CORREGIDO: Estilos específicos para ahorrar tóner --- */
+            .printable-area * {
+                color: #444 !important; /* Usar un gris oscuro en vez de negro puro para ahorrar tóner */
+                font-weight: normal !important; /* Quitar todas las negritas por defecto */
+                background-color: transparent !important; /* Asegurar que no haya fondos de color */
+                box-shadow: none !important; /* Quitar sombras */
+                text-shadow: none !important; /* Quitar sombras de texto */
+            }
+
+            /* Devolver la negrita solo a títulos importantes para mantener la jerarquía, pero con color negro para legibilidad */
+            .printable-area h1, .printable-area h2, .printable-area h3, .printable-area .font-bold {
+                font-weight: bold !important; 
+                color: #000 !important;
+            }
+            
+            /* Hacer que el texto semibold sea normal para ahorrar */
+            .printable-area .font-semibold {
+                 font-weight: normal !important;
+            }
+
+            /* Hacer los bordes de tablas y líneas más claros y finos */
+            .printable-area table, .printable-area td, .printable-area th {
+                border-color: #ccc !important; 
+            }
+
+            .printable-area hr, .printable-area .border-b-2, .printable-area .border-t-4, .printable-area .border, .printable-area .border-b {
+                border-width: 1px !important; 
+                border-color: #ccc !important;
+            }
+
+            /* Quitar subrayados que gastan tóner innecesariamente */
+            .printable-area .underline {
+                text-decoration: none !important; 
+            }
+
+            @page {
+                size: A4;
+                margin: 10mm;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script type="text/babel">
+      ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
