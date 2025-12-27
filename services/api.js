@@ -11,4 +11,4 @@
  * Se carga globalmente en `index.html` y la variable `API_URL` queda disponible
  * para todos los demás scripts que se carguen después.
  */
-const API_URL = 'https://distriapi.onzacore.site/api';
+const API_URL = 'https://distriapi2.onzacore.site/api';
