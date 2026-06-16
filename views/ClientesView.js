@@ -47,7 +47,8 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                     {isAdmin && (<button onClick={() => onShowClienteForm({})} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shrink-0"><PlusIcon className="h-5 w-5 mr-2" /> Agregar</button>)}
                 </div>
             </div>
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            {/* Vista tabla — Desktop */}
+            <div className="bg-white rounded-xl shadow-lg overflow-hidden hidden md:block">
                 <div className="overflow-x-auto">
                     {loading && <div className="p-6 flex justify-center"><Spinner className="border-blue-500"/></div>}
                     {error && <p className="p-6 text-red-500">{error}</p>}
@@ -62,7 +63,8 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {filteredClientes.map((cliente) => (
                                     <tr key={cliente.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{cliente.nombre_comercio}</td><td className="px-6 py-4 text-sm text-gray-700">{cliente.nombre_contacto}</td>
+                                        <td className="px-6 py-4 text-sm font-medium text-gray-900">{cliente.nombre_comercio}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-700">{cliente.nombre_contacto}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{cliente.telefono}</td>
                                         {isAdmin && <td className="px-6 py-4 text-right text-sm font-medium space-x-4"><a href="#" onClick={(e) => { e.preventDefault(); onShowClienteForm(cliente); }} className="text-blue-600 hover:text-blue-900">Editar</a><a href="#" onClick={(e) => { e.preventDefault(); handleDelete(cliente.id); }} className="text-red-600 hover:text-red-900">Eliminar</a></td>}
                                     </tr>
@@ -72,6 +74,35 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                     )}
                     {!loading && filteredClientes.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
                 </div>
+            </div>
+
+            {/* Vista cards — Móvil */}
+            <div className="md:hidden space-y-3">
+                {loading && <div className="p-4 flex justify-center"><Spinner className="border-blue-500"/></div>}
+                {error && <p className="p-4 text-red-500">{error}</p>}
+                {!loading && !error && filteredClientes.map((cliente) => (
+                    <div key={cliente.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                        <div className="flex justify-between items-start">
+                            <div className="min-w-0">
+                                <p className="font-bold text-gray-900 truncate">{cliente.nombre_comercio}</p>
+                                {cliente.nombre_contacto && <p className="text-sm text-gray-500">{cliente.nombre_contacto}</p>}
+                            </div>
+                            {isAdmin && (
+                                <div className="flex gap-2 shrink-0 ml-2">
+                                    <button onClick={() => onShowClienteForm(cliente)} className="text-xs text-blue-600 font-semibold py-1 px-2 rounded bg-blue-50">Editar</button>
+                                    <button onClick={() => handleDelete(cliente.id)} className="text-xs text-red-500 font-semibold py-1 px-2 rounded bg-red-50">Eliminar</button>
+                                </div>
+                            )}
+                        </div>
+                        {cliente.telefono && (
+                            <a href={`tel:${cliente.telefono}`} className="mt-2 flex items-center gap-1 text-sm text-blue-600 font-medium">
+                                📞 {cliente.telefono}
+                            </a>
+                        )}
+                        {cliente.direccion && <p className="text-xs text-gray-400 mt-1">{cliente.direccion}</p>}
+                    </div>
+                ))}
+                {!loading && filteredClientes.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
             </div>
         </div>
     );

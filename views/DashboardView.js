@@ -63,9 +63,9 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
     return (
         <div className="space-y-8">
-            <div className="flex justify-between items-center flex-wrap gap-4">
+            <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-center">
                 <div><h1 className="text-3xl font-bold text-gray-800">Dashboard</h1><p className="text-gray-500">Resumen general de la actividad.</p></div>
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-3">
                     <div className="flex items-center gap-2 bg-gray-200 p-1 rounded-lg"><button onClick={() => setDataSource('pedidos')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${dataSource === 'pedidos' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Pedidos App</button><button onClick={() => setDataSource('presencial')} className={`px-3 py-1 text-sm font-semibold rounded-md transition-colors ${dataSource === 'presencial' ? 'bg-white shadow text-blue-600' : 'text-gray-600'}`}>Ventas Presenciales</button></div>
                     <button onClick={onShowImportVentasModal} className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0"><UploadIcon className="h-5 w-5 mr-2" /> Importar</button>
                 </div>
