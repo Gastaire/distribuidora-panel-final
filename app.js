@@ -866,10 +866,10 @@
                         return <ActividadView />;
                     case 'analisis':
                         return <AnalyticsView allCategories={categorias} />;
-                    // --- INICIO DE LA MODIFICACIÓN ---
                     case 'integridad':
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
-                    // --- FIN DE LA MODIFICACIÓN ---
+                    case 'reportes':
+                        return <ReportesView />;
                     case 'dashboard': 
                     default:
                         return <DashboardView onShowImportVentasModal={onShowImportVentasModal} />;
@@ -902,6 +902,7 @@
                             {isAdmin && <NavItem icon={<UsersIcon />} text="Usuarios" active={currentPage === 'usuarios'} onClick={() => handleNavItemClick('usuarios')} />}
                             {isAdmin && <NavItem icon={<ActivityIcon />} text="Actividad" active={currentPage === 'actividad'} onClick={() => handleNavItemClick('actividad')} />}
                             {isAdmin && <NavItem icon={<ShieldWarningIcon />} text="Integridad" active={currentPage === 'integridad'} onClick={() => handleNavItemClick('integridad')} />}
+                            {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                         </nav>
                         <div className="px-4 py-6 border-t border-gray-700">
                             <div className="mb-4"><p className="text-sm font-semibold">{user.nombre}</p><p className="text-xs text-gray-400 capitalize">{user.rol}</p></div>
