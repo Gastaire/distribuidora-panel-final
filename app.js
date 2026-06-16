@@ -896,13 +896,13 @@
                             <NavItem icon={<HomeIcon />} text="Dashboard" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
                             {isAdmin && <NavItem icon={<ChartBarIcon />} text="Análisis" active={currentPage === 'analisis'} onClick={() => handleNavItemClick('analisis')} />}
                             <NavItem icon={<ShoppingCartIcon />} text="Pedidos" active={currentPage === 'pedidos'} onClick={() => handleNavItemClick('pedidos')} />
+                            {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
                             {isAdmin && <NavItem icon={<TagIcon />} text="Categorías" active={currentPage === 'categorias'} onClick={() => handleNavItemClick('categorias')} />}
                             <NavItem icon={<UsersIcon />} text="Clientes" active={currentPage === 'clientes'} onClick={() => handleNavItemClick('clientes')} />
                             {isAdmin && <NavItem icon={<UsersIcon />} text="Usuarios" active={currentPage === 'usuarios'} onClick={() => handleNavItemClick('usuarios')} />}
                             {isAdmin && <NavItem icon={<ActivityIcon />} text="Actividad" active={currentPage === 'actividad'} onClick={() => handleNavItemClick('actividad')} />}
                             {isAdmin && <NavItem icon={<ShieldWarningIcon />} text="Integridad" active={currentPage === 'integridad'} onClick={() => handleNavItemClick('integridad')} />}
-                            {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                         </nav>
                         <div className="px-4 py-6 border-t border-gray-700">
                             <div className="mb-4"><p className="text-sm font-semibold">{user.nombre}</p><p className="text-xs text-gray-400 capitalize">{user.rol}</p></div>

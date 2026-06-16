@@ -143,8 +143,16 @@ const ReportesView = () => {
         const r = diario.resumen;
         return (
             <div className="space-y-6">
+                <div className="bg-gray-50 p-4 rounded-xl border flex items-center justify-between">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-800">Resumen del Período</h2>
+                        <p className="text-sm text-gray-500">
+                            Del {new Date(diario.periodo.desde + 'T00:00:00').toLocaleDateString('es-AR')} al {new Date(diario.periodo.hasta + 'T00:00:00').toLocaleDateString('es-AR')}
+                        </p>
+                    </div>
+                </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <Card label="Total pedidos" value={fmtN(r.total_pedidos)} color="blue" />
+                    <Card label="Total pedidos (activos)" value={fmtN(r.total_pedidos)} color="blue" />
                     <Card label="Monto total" value={`$${fmt(r.monto_total)}`} color="green" />
                     <Card label="Clientes atendidos" value={fmtN(r.clientes_unicos)} color="purple" />
                     <Card label="Vendedores activos" value={fmtN(r.vendedores_activos)} color="orange" />
