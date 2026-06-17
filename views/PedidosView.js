@@ -24,11 +24,16 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const fetchPedidos = React.useCallback(async (signal) => {
         setLoading(true);
         setError(null);
+        const isSignal = signal instanceof AbortSignal;
         try {
-            const response = await fetch(`${API_URL}/pedidos`, { headers: { 'Authorization': `Bearer ${token}` }, signal });
+            const fetchOptions = { headers: { 'Authorization': `Bearer ${token}` } };
+            if (isSignal) {
+                fetchOptions.signal = signal;
+            }
+            const response = await fetch(`${API_URL}/pedidos`, fetchOptions);
             if (!response.ok) throw new Error('No se pudo obtener la lista de pedidos.');
             const data = await response.json();
-            if (!signal.aborted) {
+            if (!isSignal || !signal.aborted) {
                 setPedidos(data);
             }
         } catch (err) {
@@ -36,7 +41,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 setError(err.message);
             }
         } finally {
-            if (!signal.aborted) {
+            if (!isSignal || !signal.aborted) {
                 setLoading(false);
             }
         }
