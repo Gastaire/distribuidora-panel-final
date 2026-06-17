@@ -16,6 +16,7 @@ const ReportesView = () => {
     const [endDate, setEndDate] = React.useState(hoy);
     const [diasInactivo, setDiasInactivo] = React.useState(30);
     const [orderBy, setOrderBy] = React.useState('cantidad');
+    const [filtroCategoria, setFiltroCategoria] = React.useState('');
 
     // --- Estado de datos ---
     const [resumen, setResumen] = React.useState(null);
@@ -48,7 +49,7 @@ const ReportesView = () => {
             if (activeTab === 'vendedores')  setVendedores(await apiFetch(`/reportes/pedidos-por-vendedor${qs}`));
             if (activeTab === 'entregados')  setEntregados(await apiFetch(`/reportes/pedidos-entregados${qs}`));
             if (activeTab === 'inactivos')   setInactivos(await apiFetch(`/reportes/clientes-inactivos?dias=${diasInactivo}`));
-            if (activeTab === 'productos')   setProductos(await apiFetch(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30`));
+            if (activeTab === 'productos')   setProductos(await apiFetch(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30${filtroCategoria ? `&categoria=${encodeURIComponent(filtroCategoria)}` : ''}`));
             if (activeTab === 'faltantes')   setFaltantes(await apiFetch(`/reportes/faltantes-historico${qs}`));
             if (activeTab === 'categorias')  setCategorias(await apiFetch(`/reportes/categorias-comparativa${qs}`));
         } catch (e) {
@@ -58,7 +59,7 @@ const ReportesView = () => {
         }
     };
 
-    React.useEffect(() => { cargar(); }, [activeTab]);
+    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria]);
 
     const TABS = [
         { id: 'resumen',    label: '📊 Resumen' },
@@ -108,13 +109,13 @@ const ReportesView = () => {
         <div className="flex flex-wrap items-end gap-3 bg-white border rounded-xl p-4 mb-6 shadow-sm">
             <div>
                 <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
-                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <input type="text" placeholder="DD/MM/YYYY" defaultValue={startDate ? startDate.split('-').reverse().join('/') : ''} onFocus={e => e.target.type = 'date'} onBlur={e => { e.target.type = 'text'; if(e.target.value) { const [y,m,d] = e.target.value.split('-'); e.target.value = `${d}/${m}/${y}`; } }} onChange={e => { if(e.target.type === 'date') setStartDate(e.target.value); }}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
             </div>
             <div>
                 <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
-                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <input type="text" placeholder="DD/MM/YYYY" defaultValue={endDate ? endDate.split('-').reverse().join('/') : ''} onFocus={e => e.target.type = 'date'} onBlur={e => { e.target.type = 'text'; if(e.target.value) { const [y,m,d] = e.target.value.split('-'); e.target.value = `${d}/${m}/${y}`; } }} onChange={e => { if(e.target.type === 'date') setEndDate(e.target.value); }}
+                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
             </div>
             {activeTab === 'inactivos' && (
                 <div>
@@ -328,8 +329,15 @@ const ReportesView = () => {
     const TabProductos = () => {
         if (!productos) return null;
         return (
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="px-5 py-3 border-b bg-gray-50 flex justify-between items-center">
+            <div className="space-y-4">
+                {filtroCategoria && (
+                    <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex justify-between items-center text-sm shadow-sm">
+                        <span>Filtrando por categoría: <strong className="text-blue-900 text-base ml-1">{filtroCategoria}</strong></span>
+                        <button onClick={() => setFiltroCategoria('')} className="text-blue-700 hover:text-blue-900 font-bold px-3 py-1.5 bg-white rounded-lg border border-blue-200 shadow-sm transition">Limpiar Filtro</button>
+                    </div>
+                )}
+                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                    <div className="px-5 py-3 border-b bg-gray-50 flex justify-between items-center">
                     <h3 className="font-bold text-gray-700">Top {productos.total_productos} productos — ordenados por {productos.order_by === 'monto' ? 'monto' : 'unidades'}</h3>
                 </div>
                 <div className="overflow-x-auto">
@@ -362,6 +370,7 @@ const ReportesView = () => {
                         </tbody>
                     </table>
                 </div>
+            </div>
             </div>
         );
     };
@@ -504,9 +513,14 @@ const ReportesView = () => {
                             </thead>
                             <tbody className="divide-y">
                                 {sorted.map((c, i) => (
-                                    <tr key={c.categoria} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-semibold text-gray-800">
-                                            <span className="text-gray-400 mr-2">{i+1}</span>{c.categoria}
+                                    <tr 
+                                        key={c.categoria} 
+                                        className="hover:bg-blue-50 cursor-pointer transition-colors"
+                                        onClick={() => { setFiltroCategoria(c.categoria); setActiveTab('productos'); }}
+                                        title="Ver productos de esta categoría"
+                                    >
+                                        <td className="px-4 py-3 font-semibold text-blue-600 hover:underline">
+                                            <span className="text-gray-400 mr-2 no-underline">{i+1}</span>{c.categoria}
                                         </td>
                                         <td className="px-4 py-3 text-right font-bold text-green-700">${fmt(c.monto_total)}</td>
                                         <td className="px-4 py-3 text-right">
