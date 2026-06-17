@@ -11,19 +11,21 @@ const ReportesView = () => {
     const hoy = new Date().toISOString().slice(0, 10);
     const inicioSemana = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
 
-    const [activeTab, setActiveTab] = React.useState('diario');
+    const [activeTab, setActiveTab] = React.useState('resumen');
     const [startDate, setStartDate] = React.useState(inicioSemana);
     const [endDate, setEndDate] = React.useState(hoy);
     const [diasInactivo, setDiasInactivo] = React.useState(30);
     const [orderBy, setOrderBy] = React.useState('cantidad');
 
     // --- Estado de datos ---
+    const [resumen, setResumen] = React.useState(null);
     const [diario, setDiario] = React.useState(null);
     const [vendedores, setVendedores] = React.useState(null);
     const [entregados, setEntregados] = React.useState(null);
     const [inactivos, setInactivos] = React.useState(null);
     const [productos, setProductos] = React.useState(null);
     const [faltantes, setFaltantes] = React.useState(null);
+    const [categorias, setCategorias] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
 
@@ -41,12 +43,14 @@ const ReportesView = () => {
         setError(null);
         try {
             const qs = `?startDate=${startDate}&endDate=${endDate}`;
+            if (activeTab === 'resumen')     setResumen(await apiFetch(`/reportes/resumen-ejecutivo${qs}`));
             if (activeTab === 'diario')      setDiario(await apiFetch(`/reportes/diario-pedidos${qs}`));
             if (activeTab === 'vendedores')  setVendedores(await apiFetch(`/reportes/pedidos-por-vendedor${qs}`));
             if (activeTab === 'entregados')  setEntregados(await apiFetch(`/reportes/pedidos-entregados${qs}`));
             if (activeTab === 'inactivos')   setInactivos(await apiFetch(`/reportes/clientes-inactivos?dias=${diasInactivo}`));
             if (activeTab === 'productos')   setProductos(await apiFetch(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30`));
             if (activeTab === 'faltantes')   setFaltantes(await apiFetch(`/reportes/faltantes-historico${qs}`));
+            if (activeTab === 'categorias')  setCategorias(await apiFetch(`/reportes/categorias-comparativa${qs}`));
         } catch (e) {
             setError(e.message);
         } finally {
@@ -57,12 +61,13 @@ const ReportesView = () => {
     React.useEffect(() => { cargar(); }, [activeTab]);
 
     const TABS = [
-        { id: 'diario',     label: '📋 Diario' },
+        { id: 'resumen',    label: '📊 Resumen' },
         { id: 'vendedores', label: '🏆 Vendedores' },
         { id: 'entregados', label: '✅ Entregados' },
         { id: 'inactivos',  label: '💤 Inactivos' },
         { id: 'productos',  label: '📦 Productos' },
         { id: 'faltantes',  label: '⚠️ Faltantes' },
+        { id: 'categorias', label: '📁 Categorías' },
     ];
 
     const ESTADO_COLORS = {
@@ -424,13 +429,115 @@ const ReportesView = () => {
         );
     };
 
+    // ─── Tab Resumen Ejecutivo ────────────────────────────────────────────────
+    const TabResumen = () => {
+        if (!resumen) return null;
+        const k = resumen.kpis;
+        const KpiCard = ({ label, value, sub, color = 'blue' }) => {
+            const colors = { blue: 'border-blue-400 bg-blue-50', green: 'border-green-400 bg-green-50', purple: 'border-purple-400 bg-purple-50', orange: 'border-orange-400 bg-orange-50', red: 'border-red-400 bg-red-50' };
+            const text = { blue: 'text-blue-700', green: 'text-green-700', purple: 'text-purple-700', orange: 'text-orange-700', red: 'text-red-700' };
+            return (
+                <div className={`border-l-4 rounded-lg p-4 ${colors[color]}`}>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${text[color]}`}>{value}</p>
+                    {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+                </div>
+            );
+        };
+        return (
+            <div className="space-y-6">
+                <div className="bg-gray-50 border rounded-xl p-3 text-sm text-gray-500">
+                    Período: <strong>{new Date(resumen.periodo.desde+'T00:00:00').toLocaleDateString('es-AR')}</strong> al <strong>{new Date(resumen.periodo.hasta+'T00:00:00').toLocaleDateString('es-AR')}</strong> — {resumen.periodo.dias} días
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <KpiCard label="Ingresos totales" value={`$${fmt(k.ingresos_totales)}`} color="green" />
+                    <KpiCard label="Ticket promedio" value={`$${fmt(k.ticket_promedio)}`} sub="por pedido" color="blue" />
+                    <KpiCard label="Pedidos activos" value={fmtN(k.total_pedidos)} sub={`${k.pedidos_por_dia}/día prom.`} color="purple" />
+                    <KpiCard label="Clientes atendidos" value={fmtN(k.clientes_atendidos)} color="orange" />
+                    <KpiCard label="Tasa de entrega" value={`${k.tasa_entrega}%`} sub="pedidos entregados" color={parseFloat(k.tasa_entrega) > 50 ? 'green' : 'orange'} />
+                    <KpiCard label="Tasa de cancelación" value={`${k.tasa_cancelacion}%`} color={parseFloat(k.tasa_cancelacion) > 10 ? 'red' : 'blue'} />
+                </div>
+                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                    <div className="px-5 py-3 border-b bg-gray-50"><h3 className="font-bold text-gray-700">Pipeline de pedidos</h3></div>
+                    <table className="min-w-full text-sm">
+                        <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                            <tr><th className="px-4 py-2 text-left">Estado</th><th className="px-4 py-2 text-right">Pedidos</th><th className="px-4 py-2 text-right">Clientes</th><th className="px-4 py-2 text-right">Monto</th></tr>
+                        </thead>
+                        <tbody className="divide-y">
+                            {resumen.por_estado.map(e => (
+                                <tr key={e.estado} className="hover:bg-gray-50">
+                                    <td className="px-4 py-2"><BadgeEstado estado={e.estado} /></td>
+                                    <td className="px-4 py-2 text-right font-semibold">{fmtN(e.total_pedidos)}</td>
+                                    <td className="px-4 py-2 text-right">{fmtN(e.clientes_unicos)}</td>
+                                    <td className="px-4 py-2 text-right font-semibold text-green-700">${fmt(e.monto_total)}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
+    };
+
+    // ─── Tab Categorías ───────────────────────────────────────────────────────
+    const TabCategorias = () => {
+        if (!categorias) return null;
+        const { items: sorted, requestSort, sortConfig } = useSortableData(categorias.categorias, { key: 'monto_total', direction: 'descending' });
+        return (
+            <div className="space-y-4">
+                <div className="bg-gray-50 border rounded-xl p-3 text-sm text-gray-500">
+                    Ingreso global del período: <strong className="text-green-700">${fmt(categorias.monto_global)}</strong> · {categorias.total_categorias} categorías activas
+                </div>
+                <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead className="bg-gray-50 text-xs uppercase text-gray-500">
+                                <tr>
+                                    <TableHeader sortKey="categoria" sortConfig={sortConfig} onSort={requestSort}>Categoría</TableHeader>
+                                    <TableHeader sortKey="monto_total" sortConfig={sortConfig} onSort={requestSort}>Monto</TableHeader>
+                                    <TableHeader sortKey="pct_del_total" sortConfig={sortConfig} onSort={requestSort}>% Total</TableHeader>
+                                    <TableHeader sortKey="unidades_vendidas" sortConfig={sortConfig} onSort={requestSort}>Unidades</TableHeader>
+                                    <TableHeader sortKey="productos_activos" sortConfig={sortConfig} onSort={requestSort}>Productos</TableHeader>
+                                    <TableHeader sortKey="aparece_en_pedidos" sortConfig={sortConfig} onSort={requestSort}>Pedidos</TableHeader>
+                                    <th className="px-4 py-2 text-left">Producto estrella</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {sorted.map((c, i) => (
+                                    <tr key={c.categoria} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 font-semibold text-gray-800">
+                                            <span className="text-gray-400 mr-2">{i+1}</span>{c.categoria}
+                                        </td>
+                                        <td className="px-4 py-3 text-right font-bold text-green-700">${fmt(c.monto_total)}</td>
+                                        <td className="px-4 py-3 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <div className="w-16 bg-gray-100 rounded-full h-1.5"><div className="bg-blue-500 h-1.5 rounded-full" style={{width:`${Math.min(parseFloat(c.pct_del_total),100)}%`}}></div></div>
+                                                <span className="font-semibold w-10 text-right">{c.pct_del_total}%</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">{fmtN(c.unidades_vendidas)}</td>
+                                        <td className="px-4 py-3 text-right">{fmtN(c.productos_activos)}</td>
+                                        <td className="px-4 py-3 text-right">{fmtN(c.aparece_en_pedidos)}</td>
+                                        <td className="px-4 py-3 text-xs text-gray-500 max-w-xs truncate">{c.producto_estrella}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     const tabContent = {
+        resumen:    <TabResumen />,
         diario:     <TabDiario />,
         vendedores: <TabVendedores />,
         entregados: <TabEntregados />,
         inactivos:  <TabInactivos />,
         productos:  <TabProductos />,
         faltantes:  <TabFaltantes />,
+        categorias: <TabCategorias />,
     };
 
     return (

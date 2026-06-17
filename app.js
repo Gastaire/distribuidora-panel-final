@@ -864,8 +864,6 @@
                         return <UsuariosView onShowUsuarioForm={onShowUsuarioForm} />;
                     case 'actividad': 
                         return <ActividadView />;
-                    case 'analisis':
-                        return <AnalyticsView allCategories={categorias} />;
                     case 'integridad':
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
                     case 'reportes':
@@ -894,7 +892,6 @@
                         </div>
                         <nav className="flex-1 px-4 py-6 space-y-2">
                             <NavItem icon={<HomeIcon />} text="Dashboard" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
-                            {isAdmin && <NavItem icon={<ChartBarIcon />} text="Análisis" active={currentPage === 'analisis'} onClick={() => handleNavItemClick('analisis')} />}
                             <NavItem icon={<ShoppingCartIcon />} text="Pedidos" active={currentPage === 'pedidos'} onClick={() => handleNavItemClick('pedidos')} />
                             {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
