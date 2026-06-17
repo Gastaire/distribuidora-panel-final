@@ -9,10 +9,8 @@ const DashboardView = ({ onShowImportVentasModal }) => {
     const [dataSource, setDataSource] = React.useState('pedidos');
     const token = localStorage.getItem('token');
 
-    // Refs para los canvas
     const topProductsRef = React.useRef(null);
     const topFaltantesRef = React.useRef(null);
-    const evolutionRef    = React.useRef(null);
     const chartInstances  = React.useRef({});
 
     const CHART_COLORS = [
@@ -28,24 +26,13 @@ const DashboardView = ({ onShowImportVentasModal }) => {
         'rgba(239, 68, 68, 0.85)',
     ];
 
-    const LINE_COLORS = [
-        { border: 'rgb(59, 130, 246)',   bg: 'rgba(59, 130, 246, 0.1)'   },
-        { border: 'rgb(16, 185, 129)',   bg: 'rgba(16, 185, 129, 0.1)'   },
-        { border: 'rgb(245, 158, 11)',   bg: 'rgba(245, 158, 11, 0.1)'   },
-        { border: 'rgb(139, 92, 246)',   bg: 'rgba(139, 92, 246, 0.1)'   },
-        { border: 'rgb(236, 72, 153)',   bg: 'rgba(236, 72, 153, 0.1)'   },
-    ];
-
     const destroyCharts = () => {
         Object.values(chartInstances.current).forEach(c => { try { c.destroy(); } catch(e){} });
         chartInstances.current = {};
     };
 
-    // Flag isMounted — evita actualizar estado en componentes desmontados
-    // sin depender de AbortController (más compatible con entornos Babel/CDN)
     React.useEffect(() => {
         let isMounted = true;
-
         const doFetch = async () => {
             setLoading(true); setError(null); setStats(null);
             try {
@@ -63,24 +50,19 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 if (isMounted) setLoading(false);
             }
         };
-
         doFetch();
-
-        return () => {
-            isMounted = false;
-            destroyCharts();
-        };
+        return () => { isMounted = false; destroyCharts(); };
     }, [startDate, endDate, dataSource, token, fetchTrigger]);
 
     React.useEffect(() => {
         if (!stats) return;
         destroyCharts();
 
-        // ── Gráfico A: Top 10 Más Vendidos ──────────────────────────────────────
+        // ── Gráfico A: Top 10 Más Vendidos ────────────────────────────────────
         const topProdCanvas = topProductsRef.current;
         if (topProdCanvas && stats.topProducts && stats.topProducts.length > 0) {
-            const labels  = stats.topProducts.map(p => p.nombre);
-            const data    = stats.topProducts.map(p => parseFloat(p.totalQuantity));
+            const labels = stats.topProducts.map(p => p.nombre);
+            const data   = stats.topProducts.map(p => parseFloat(p.totalQuantity));
             chartInstances.current.topProducts = new Chart(topProdCanvas, {
                 type: 'bar',
                 data: {
@@ -110,13 +92,13 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                     },
                     scales: {
                         x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } },
-                        y: { ticks: { font: { size: 11 }, callback: (v, i) => { const l = labels[i]; return l.length > 22 ? l.slice(0, 22) + '…' : l; } } }
+                        y: { ticks: { font: { size: 11 }, callback: (v, i) => { const l = labels[i]; return l && l.length > 22 ? l.slice(0, 22) + '…' : l; } } }
                     }
                 }
             });
         }
 
-        // ── Gráfico B: Top Faltantes ─────────────────────────────────────────────
+        // ── Gráfico B: Top Faltantes ──────────────────────────────────────────
         const topFaltCanvas = topFaltantesRef.current;
         if (topFaltCanvas && stats.topFaltantes && stats.topFaltantes.length > 0) {
             const labels = stats.topFaltantes.map(p => p.nombre);
@@ -152,47 +134,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                     },
                     scales: {
                         x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } },
-                        y: { ticks: { font: { size: 11 }, callback: (v, i) => { const l = labels[i]; return l.length > 22 ? l.slice(0, 22) + '…' : l; } } }
-                    }
-                }
-            });
-        }
-
-        // ── Gráfico C: Evolución Comparada top 5 ────────────────────────────────
-        const evoCanvas = evolutionRef.current;
-        const evo = stats.topProductsEvolution;
-        if (evoCanvas && evo && evo.fechas && evo.fechas.length > 0 && evo.series && evo.series.length > 0) {
-            const labels = evo.fechas.map(f => new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }));
-            chartInstances.current.evolution = new Chart(evoCanvas, {
-                type: 'line',
-                data: {
-                    labels,
-                    datasets: evo.series.map((serie, i) => ({
-                        label: serie.producto.length > 20 ? serie.producto.slice(0, 20) + '…' : serie.producto,
-                        data: serie.datos,
-                        borderColor: LINE_COLORS[i % LINE_COLORS.length].border,
-                        backgroundColor: LINE_COLORS[i % LINE_COLORS.length].bg,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: evo.fechas.length > 30 ? 2 : 4,
-                        pointHoverRadius: 6,
-                        borderWidth: 2,
-                    }))
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'bottom',
-                            labels: { font: { size: 11 }, boxWidth: 12, padding: 10 }
-                        },
-                    },
-                    scales: {
-                        x: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 }, maxTicksLimit: 15 } },
-                        y: { grid: { color: 'rgba(0,0,0,0.04)' }, ticks: { font: { size: 11 } }, beginAtZero: true }
+                        y: { ticks: { font: { size: 11 }, callback: (v, i) => { const l = labels[i]; return l && l.length > 22 ? l.slice(0, 22) + '…' : l; } } }
                     }
                 }
             });
@@ -200,7 +142,6 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
     }, [stats]);
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
     const formatMoney = (v) => `$${parseFloat(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
     const formatNum   = (v) => parseFloat(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
 
@@ -215,6 +156,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
     return (
         <div className="space-y-6">
+
             {/* ── Header ─────────────────────────────────────────────────────── */}
             <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-end">
                 <div>
@@ -237,8 +179,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 <div>
                     <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
                     <input
-                        type="text"
-                        placeholder="DD/MM/YYYY"
+                        type="text" placeholder="DD/MM/YYYY"
                         onFocus={e => e.target.type = 'date'}
                         onBlur={e => { e.target.type = 'text'; if (e.target.value) { const [y,m,d]=e.target.value.split('-'); e.target.value=`${d}/${m}/${y}`; } }}
                         defaultValue={startDate.split('-').reverse().join('/')}
@@ -249,8 +190,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 <div>
                     <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
                     <input
-                        type="text"
-                        placeholder="DD/MM/YYYY"
+                        type="text" placeholder="DD/MM/YYYY"
                         onFocus={e => e.target.type = 'date'}
                         onBlur={e => { e.target.type = 'text'; if (e.target.value) { const [y,m,d]=e.target.value.split('-'); e.target.value=`${d}/${m}/${y}`; } }}
                         defaultValue={endDate.split('-').reverse().join('/')}
@@ -276,30 +216,10 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
                     {/* ── KPIs principales ──────────────────────────────────── */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <StatCard
-                            title="Ingresos Totales"
-                            value={formatMoney(stats.totalRevenue)}
-                            icon={<ChartBarIcon className="h-6 w-6 text-green-600" />}
-                            color="green"
-                        />
-                        <StatCard
-                            title="Transacciones"
-                            value={formatNum(stats.totalOrders)}
-                            icon={<ShoppingCartIcon className="h-6 w-6 text-blue-600" />}
-                            color="blue"
-                        />
-                        <StatCard
-                            title="Ticket Promedio"
-                            value={formatMoney(stats.totalOrders > 0 ? stats.totalRevenue / stats.totalOrders : 0)}
-                            icon={<ActivityIcon className="h-6 w-6 text-purple-600" />}
-                            color="purple"
-                        />
-                        <StatCard
-                            title="Unidades Vendidas"
-                            value={formatNum(stats.unidadesVendidas)}
-                            icon={<PackageIcon className="h-6 w-6 text-orange-600" />}
-                            color="orange"
-                        />
+                        <StatCard title="Ingresos Totales"  value={formatMoney(stats.totalRevenue)}  icon={<ChartBarIcon className="h-6 w-6 text-green-600" />}  color="green" />
+                        <StatCard title="Transacciones"     value={formatNum(stats.totalOrders)}     icon={<ShoppingCartIcon className="h-6 w-6 text-blue-600" />} color="blue" />
+                        <StatCard title="Ticket Promedio"   value={formatMoney(stats.totalOrders > 0 ? stats.totalRevenue / stats.totalOrders : 0)} icon={<ActivityIcon className="h-6 w-6 text-purple-600" />} color="purple" />
+                        <StatCard title="Unidades Vendidas" value={formatNum(stats.unidadesVendidas)} icon={<PackageIcon className="h-6 w-6 text-orange-600" />}   color="orange" />
                     </div>
 
                     {/* ── KPIs avanzados (solo App) ─────────────────────────── */}
@@ -327,7 +247,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                         </div>
                     )}
 
-                    {/* ── Gráficos — fila 1 ─────────────────────────────────── */}
+                    {/* ── Gráficos ──────────────────────────────────────────── */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                         {/* Gráfico A: Top 10 Más Vendidos */}
@@ -336,43 +256,27 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                                 <h3 className="font-bold text-gray-700">🏆 Top 10 Más Vendidos</h3>
                                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">unidades · período</span>
                             </div>
-                            <p className="text-xs text-gray-400 mb-3">Productos con mayor volumen de ventas en el rango seleccionado</p>
-                            <div className="relative flex-1" style={{ minHeight: '320px' }}>
+                            <p className="text-xs text-gray-400 mb-3">Productos con mayor volumen en el rango seleccionado</p>
+                            <div className="relative flex-1" style={{ minHeight: '300px' }}>
                                 {stats.topProducts && stats.topProducts.length > 0
                                     ? <canvas ref={topProductsRef}></canvas>
                                     : noDataMsg()}
                             </div>
                         </div>
 
-                        {/* Gráfico B: Top Faltantes (solo pedidos) */}
+                        {/* Gráfico B: Top Faltantes */}
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col">
                             <div className="flex justify-between items-center mb-1">
                                 <h3 className="font-bold text-gray-700">⚠️ Top Faltantes del Período</h3>
                                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">unidades removidas</span>
                             </div>
-                            <p className="text-xs text-gray-400 mb-3">Productos más removidos por sin-stock en pedidos del rango</p>
-                            <div className="relative flex-1" style={{ minHeight: '320px' }}>
+                            <p className="text-xs text-gray-400 mb-3">Productos más removidos por sin-stock en el rango</p>
+                            <div className="relative flex-1" style={{ minHeight: '300px' }}>
                                 {dataSource === 'pedidos'
                                     ? (stats.topFaltantes && stats.topFaltantes.length > 0
                                         ? <canvas ref={topFaltantesRef}></canvas>
                                         : noDataMsg('Sin faltantes registrados en este período ✓'))
                                     : noDataMsg('Solo disponible para la fuente App')}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Gráfico C: Evolución Comparada ────────────────────── */}
-                    <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col">
-                        <div className="flex justify-between items-center mb-1">
-                            <h3 className="font-bold text-gray-700">📈 Evolución Comparada de los Top 5 Productos</h3>
-                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">unidades/día</span>
-                        </div>
-                        <p className="text-xs text-gray-400 mb-3">Tendencia diaria de los 5 productos más vendidos del período</p>
-                        <div className="overflow-x-auto">
-                            <div style={{ minWidth: `${Math.max((stats.topProductsEvolution?.fechas?.length || 0) * 35, 500)}px`, height: '280px', position: 'relative' }}>
-                                {stats.topProductsEvolution?.fechas?.length > 0 && stats.topProductsEvolution?.series?.length > 0
-                                    ? <canvas ref={evolutionRef}></canvas>
-                                    : noDataMsg()}
                             </div>
                         </div>
                     </div>
