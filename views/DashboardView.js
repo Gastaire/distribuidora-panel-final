@@ -40,22 +40,37 @@ const DashboardView = ({ onShowImportVentasModal }) => {
         chartInstances.current = {};
     };
 
-    const fetchStats = React.useCallback(async () => {
+    const fetchStats = React.useCallback(async (signal) => {
         setLoading(true); setError(null); setStats(null);
         try {
             const url = `${API_URL}/dashboard/stats?source=${dataSource}&startDate=${startDate}&endDate=${endDate}&topProductsLimit=10`;
-            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` }, signal });
             if (!response.ok) {
                 const errData = await response.json();
                 throw new Error(errData.message || 'No se pudieron cargar las estadísticas.');
             }
-            setStats(await response.json());
-        } catch (err) { setError(err.message); } finally { setLoading(false); }
+            const data = await response.json();
+            if (!signal.aborted) {
+                setStats(data);
+            }
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                setError(err.message);
+            }
+        } finally {
+            if (!signal.aborted) {
+                setLoading(false);
+            }
+        }
     }, [token, startDate, endDate, dataSource]);
 
     React.useEffect(() => {
-        fetchStats();
-        return () => destroyCharts();
+        const controller = new AbortController();
+        fetchStats(controller.signal);
+        return () => {
+            controller.abort();
+            destroyCharts();
+        };
     }, [fetchStats]);
 
     React.useEffect(() => {

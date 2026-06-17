@@ -21,22 +21,33 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const token = localStorage.getItem('token');
     const { items: sortedPedidos, requestSort, sortConfig } = useSortableData(pedidos, { key: 'id', direction: 'descending' });
 
-    const fetchPedidos = React.useCallback(async () => {
+    const fetchPedidos = React.useCallback(async (signal) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await fetch(`${API_URL}/pedidos`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const response = await fetch(`${API_URL}/pedidos`, { headers: { 'Authorization': `Bearer ${token}` }, signal });
             if (!response.ok) throw new Error('No se pudo obtener la lista de pedidos.');
-            setPedidos(await response.json());
+            const data = await response.json();
+            if (!signal.aborted) {
+                setPedidos(data);
+            }
         } catch (err) {
-            setError(err.message);
+            if (err.name !== 'AbortError') {
+                setError(err.message);
+            }
         } finally {
-            setLoading(false);
+            if (!signal.aborted) {
+                setLoading(false);
+            }
         }
     }, [token]);
 
     React.useEffect(() => {
-        fetchPedidos();
+        const controller = new AbortController();
+        fetchPedidos(controller.signal);
+        return () => {
+            controller.abort();
+        };
     }, [fetchPedidos]);
 
     const handleActionConfirm = async () => {
