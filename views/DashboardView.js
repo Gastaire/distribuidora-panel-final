@@ -2,6 +2,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
     const [stats, setStats] = React.useState(null);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
+    const [fetchTrigger, setFetchTrigger] = React.useState(0);
 
     const [startDate, setStartDate] = React.useState(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
     const [endDate, setEndDate] = React.useState(new Date().toISOString().slice(0, 10));
@@ -40,43 +41,36 @@ const DashboardView = ({ onShowImportVentasModal }) => {
         chartInstances.current = {};
     };
 
-    const fetchStats = React.useCallback(async (signal) => {
-        setLoading(true); setError(null); setStats(null);
-        const isSignal = signal instanceof AbortSignal;
-        try {
-            const url = `${API_URL}/dashboard/stats?source=${dataSource}&startDate=${startDate}&endDate=${endDate}&topProductsLimit=10`;
-            const fetchOptions = { headers: { 'Authorization': `Bearer ${token}` } };
-            if (isSignal) {
-                fetchOptions.signal = signal;
-            }
-            const response = await fetch(url, fetchOptions);
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.message || 'No se pudieron cargar las estadísticas.');
-            }
-            const data = await response.json();
-            if (!isSignal || !signal.aborted) {
-                setStats(data);
-            }
-        } catch (err) {
-            if (err.name !== 'AbortError') {
-                setError(err.message);
-            }
-        } finally {
-            if (!isSignal || !signal.aborted) {
-                setLoading(false);
-            }
-        }
-    }, [token, startDate, endDate, dataSource]);
-
+    // Flag isMounted — evita actualizar estado en componentes desmontados
+    // sin depender de AbortController (más compatible con entornos Babel/CDN)
     React.useEffect(() => {
-        const controller = new AbortController();
-        fetchStats(controller.signal);
+        let isMounted = true;
+
+        const doFetch = async () => {
+            setLoading(true); setError(null); setStats(null);
+            try {
+                const url = `${API_URL}/dashboard/stats?source=${dataSource}&startDate=${startDate}&endDate=${endDate}&topProductsLimit=10`;
+                const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.message || 'No se pudieron cargar las estadísticas.');
+                }
+                const data = await response.json();
+                if (isMounted) setStats(data);
+            } catch (err) {
+                if (isMounted) setError(err.message);
+            } finally {
+                if (isMounted) setLoading(false);
+            }
+        };
+
+        doFetch();
+
         return () => {
-            controller.abort();
+            isMounted = false;
             destroyCharts();
         };
-    }, [fetchStats]);
+    }, [startDate, endDate, dataSource, token, fetchTrigger]);
 
     React.useEffect(() => {
         if (!stats) return;
@@ -266,7 +260,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 </div>
                 <div className="flex-1" />
                 <button
-                    onClick={() => fetchStats()}
+                    onClick={() => setFetchTrigger(t => t + 1)}
                     className="bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
                 >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
