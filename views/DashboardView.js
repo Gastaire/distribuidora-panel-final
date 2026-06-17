@@ -76,26 +76,22 @@ const DashboardView = ({ onShowImportVentasModal }) => {
             
             {stats && (
                 <div className="space-y-8">
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <StatCard title="Ingresos Totales" value={`$${parseFloat(stats.totalRevenue).toLocaleString('es-AR')}`} icon={<UsersIcon className="h-6 w-6" />} color="blue" />
-                        <StatCard title="Pedidos/Ventas Totales" value={stats.totalOrders} icon={<ShoppingCartIcon className="h-6 w-6" />} color="blue" />
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <StatCard title="Ingresos Totales" value={`$${parseFloat(stats.totalRevenue).toLocaleString('es-AR')}`} icon={<ChartBarIcon className="h-6 w-6 text-green-600" />} color="green" />
+                        <StatCard title="Total Transacciones" value={stats.totalOrders} icon={<ShoppingCartIcon className="h-6 w-6 text-blue-600" />} color="blue" />
+                        <StatCard title="Ticket Promedio" value={`$${(stats.totalOrders > 0 ? (stats.totalRevenue / stats.totalOrders) : 0).toLocaleString('es-AR', {maximumFractionDigits: 0})}`} icon={<ActivityIcon className="h-6 w-6 text-purple-600" />} color="purple" />
+                        <StatCard title="Productos Distintos" value={stats.topProducts.length} icon={<PackageIcon className="h-6 w-6 text-orange-600" />} color="orange" />
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div className="bg-white p-6 rounded-xl shadow-lg">
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Ventas</h3><div className="flex gap-1 bg-gray-100 p-1 rounded-lg"><button onClick={() => setSalesPeriod('7d')} className={`px-2 py-1 text-xs font-bold rounded-md ${salesPeriod === '7d' ? 'bg-white shadow' : 'text-gray-500'}`}>7 Días</button><button onClick={() => setSalesPeriod('30d')} className={`px-2 py-1 text-xs font-bold rounded-md ${salesPeriod === '30d' ? 'bg-white shadow' : 'text-gray-500'}`}>30 Días</button><button onClick={() => setSalesPeriod('monthly')} className={`px-2 py-1 text-xs font-bold rounded-md ${salesPeriod === 'monthly' ? 'bg-white shadow' : 'text-gray-500'}`}>Por Mes</button></div></div>
-                            <canvas id="salesChart"></canvas>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-700">Evolución de Ingresos</h3><div className="flex gap-1 bg-gray-100 p-1 rounded-lg"><button onClick={() => setSalesPeriod('7d')} className={`px-2 py-1 text-xs font-bold rounded-md ${salesPeriod === '7d' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>7 Días</button><button onClick={() => setSalesPeriod('30d')} className={`px-2 py-1 text-xs font-bold rounded-md ${salesPeriod === '30d' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>30 Días</button><button onClick={() => setSalesPeriod('monthly')} className={`px-2 py-1 text-xs font-bold rounded-md ${salesPeriod === 'monthly' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>Meses</button></div></div>
+                            <div className="h-64"><canvas id="salesChart"></canvas></div>
                         </div>
-                        <div className="bg-white p-6 rounded-xl shadow-lg">
-                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">Productos Más Vendidos</h3><div className="flex gap-1 bg-gray-100 p-1 rounded-lg"><button onClick={() => setTopProductsLimit(5)} className={`px-2 py-1 text-xs font-bold rounded-md ${topProductsLimit === 5 ? 'bg-white shadow' : 'text-gray-500'}`}>Top 5</button><button onClick={() => setTopProductsLimit(10)} className={`px-2 py-1 text-xs font-bold rounded-md ${topProductsLimit === 10 ? 'bg-white shadow' : 'text-gray-500'}`}>Top 10</button><button onClick={() => setTopProductsLimit(20)} className={`px-2 py-1 text-xs font-bold rounded-md ${topProductsLimit === 20 ? 'bg-white shadow' : 'text-gray-500'}`}>Top 20</button></div></div>
-                            <canvas id="productsChart"></canvas>
+                        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-gray-700">Top Productos</h3><div className="flex gap-1 bg-gray-100 p-1 rounded-lg"><button onClick={() => setTopProductsLimit(5)} className={`px-2 py-1 text-xs font-bold rounded-md ${topProductsLimit === 5 ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>5</button><button onClick={() => setTopProductsLimit(10)} className={`px-2 py-1 text-xs font-bold rounded-md ${topProductsLimit === 10 ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>10</button></div></div>
+                            <div className="h-64"><canvas id="productsChart"></canvas></div>
                         </div>
                     </div>
-                    {dataSource === 'pedidos' && stats.topCustomers && stats.salesBySeller && (
-                        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                            <div className="lg:col-span-3 bg-white rounded-xl shadow-lg"><h3 className="font-bold text-lg p-6">Rendimiento por Vendedor</h3><div className="overflow-x-auto"><table className="min-w-full"><thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendedor</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pedidos</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Vendido</th></tr></thead><tbody className="divide-y divide-gray-200">{stats.salesBySeller.map(seller => (<tr key={seller.nombre}><td className="px-6 py-4 font-medium text-gray-900">{seller.nombre}</td><td className="px-6 py-4 text-gray-700">{seller.orderCount}</td><td className="px-6 py-4 text-gray-700">${parseFloat(seller.totalSold).toLocaleString('es-AR')}</td></tr>))}</tbody></table></div></div>
-                            <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-lg"><h3 className="font-bold text-lg mb-4">Top 5 Clientes (por Monto)</h3><canvas id="customersChart"></canvas></div>
-                        </div>
-                    )}
                 </div>
             )}
         </div>
