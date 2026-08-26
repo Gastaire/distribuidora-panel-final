@@ -868,6 +868,8 @@
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
                     case 'reportes':
                         return <ReportesView />;
+                    case 'zonas':
+                        return <ConfiguracionZonasView />;
                     case 'dashboard': 
                     default:
                         return <DashboardView onShowImportVentasModal={onShowImportVentasModal} />;
@@ -899,6 +901,7 @@
                             <NavItem icon={<UsersIcon />} text="Clientes" active={currentPage === 'clientes'} onClick={() => handleNavItemClick('clientes')} />
                             {isAdmin && <NavItem icon={<UsersIcon />} text="Usuarios" active={currentPage === 'usuarios'} onClick={() => handleNavItemClick('usuarios')} />}
                             {isAdmin && <NavItem icon={<ActivityIcon />} text="Actividad" active={currentPage === 'actividad'} onClick={() => handleNavItemClick('actividad')} />}
+                            {isAdmin && <NavItem icon={<svg className="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} text="Zonas" active={currentPage === 'zonas'} onClick={() => handleNavItemClick('zonas')} />}
                             {isAdmin && <NavItem icon={<ShieldWarningIcon />} text="Integridad" active={currentPage === 'integridad'} onClick={() => handleNavItemClick('integridad')} />}
                         </nav>
                         <div className="px-4 py-6 border-t border-gray-700">

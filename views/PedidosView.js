@@ -18,6 +18,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [showArchived, setShowArchived] = React.useState(false);
     const [confirmAction, setConfirmAction] = React.useState({ action: null, pedido: null });
+    const [printingHojaRuta, setPrintingHojaRuta] = React.useState(false);
     const token = localStorage.getItem('token');
     const { items: sortedPedidos, requestSort, sortConfig } = useSortableData(pedidos, { key: 'id', direction: 'descending' });
 
@@ -53,6 +54,86 @@ const PedidosView = ({ onSelectPedido, user }) => {
         }
     };
 
+    const generarHojaRutaPDF = async () => {
+        setPrintingHojaRuta(true);
+        try {
+            const res = await fetch(`${API_URL}/pedidos/hoja-ruta`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error('Error al obtener datos para hoja de ruta');
+            const data = await res.json();
+            
+            if (data.length === 0) {
+                alert('No hay pedidos facturados en las últimas 6 horas.');
+                setPrintingHojaRuta(false);
+                return;
+            }
+
+            const doc = new window.jspdf.jsPDF();
+            doc.setFontSize(18);
+            doc.text('HOJA DE RUTA - Entregas Diarias', 14, 20);
+            
+            doc.setFontSize(10);
+            doc.text(`Fecha de Emisión: ${new Date().toLocaleString('es-AR')}`, 14, 30);
+            doc.text(`Cantidad de Pedidos: ${data.length}`, 14, 35);
+            
+            // Extraer localidades únicas
+            const localidades = [...new Set(data.map(p => p.direccion).filter(Boolean))].join(', ');
+            doc.text(`Ubicaciones / Localidades: ${localidades || 'No especificadas'}`, 14, 40);
+
+            let finalY = 50;
+            let totalGeneral = 0;
+            
+            const tableData = [];
+            data.forEach(pedido => {
+                totalGeneral += Number(pedido.monto_total || 0);
+                tableData.push([
+                    `${pedido.nombre_comercio}\n(Ped #${pedido.id})`,
+                    '', // Efectivo
+                    '', // Transferencia
+                    '', // Debe
+                    ''  // Firma
+                ]);
+                tableData.push([
+                    { content: 'Observaciones: ___________________________________________________________', colSpan: 5, styles: { fillColor: [249, 249, 249], fontStyle: 'italic', cellPadding: 4 } }
+                ]);
+            });
+
+            // Fila de totales
+            tableData.push([
+                { content: 'TOTALES (A rellenar):', styles: { fontStyle: 'bold' } },
+                '', '', '', ''
+            ]);
+
+            doc.autoTable({
+                startY: finalY,
+                head: [['Cliente', 'Efectivo', 'Transferencia', 'Debe', 'Firma de Conformidad']],
+                body: tableData,
+                theme: 'grid',
+                headStyles: { fillColor: [59, 130, 246] },
+                columnStyles: {
+                    0: { cellWidth: 50 },
+                    1: { cellWidth: 25 },
+                    2: { cellWidth: 30 },
+                    3: { cellWidth: 25 },
+                    4: { cellWidth: 40 } // Espacio para firma
+                },
+                styles: { minCellHeight: 12, valign: 'middle' },
+                didDrawPage: (data) => {
+                    // Agregar pie de página en cada página si se quiere
+                }
+            });
+
+            const currentY = doc.lastAutoTable.finalY + 30;
+            doc.line(120, currentY, 190, currentY); // Línea para firma
+            doc.text('Firma del Repartidor', 140, currentY + 5);
+
+            doc.save(`Hoja_de_Ruta_${new Date().getTime()}.pdf`);
+        } catch (error) {
+            alert('Error generando PDF: ' + error.message);
+        } finally {
+            setPrintingHojaRuta(false);
+        }
+    };
+
     const filteredPedidos = React.useMemo(() => 
         sortedPedidos.filter(p =>
             (showArchived ? p.estado === 'archivado' : p.estado !== 'archivado') &&
@@ -80,7 +161,18 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 />
             )}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h1 className="text-3xl font-bold text-gray-800 shrink-0">Bandeja de Pedidos</h1>
+                <div className="flex items-center gap-4 shrink-0">
+                    <h1 className="text-3xl font-bold text-gray-800">Bandeja de Pedidos</h1>
+                    {user.rol === 'admin' && (
+                        <button 
+                            onClick={generarHojaRutaPDF} 
+                            disabled={printingHojaRuta}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm flex items-center transition"
+                        >
+                            {printingHojaRuta ? <Spinner className="w-5 h-5 mr-2 border-white" /> : '📄 Imprimir Hoja de Ruta'}
+                        </button>
+                    )}
+                </div>
                 <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-4">
                     <div className="flex items-center justify-between sm:justify-end gap-4">
                         <div className="flex items-center gap-2">
