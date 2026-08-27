@@ -67,66 +67,109 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 return;
             }
 
-            const doc = new window.jspdf.jsPDF();
-            doc.setFontSize(18);
-            doc.text('HOJA DE RUTA - Entregas Diarias', 14, 20);
-            
-            doc.setFontSize(10);
-            doc.text(`Fecha de Emisión: ${new Date().toLocaleString('es-AR')}`, 14, 30);
-            doc.text(`Cantidad de Pedidos: ${data.length}`, 14, 35);
-            
-            // Extraer localidades únicas
-            const localidades = [...new Set(data.map(p => p.direccion).filter(Boolean))].join(', ');
-            doc.text(`Ubicaciones / Localidades: ${localidades || 'No especificadas'}`, 14, 40);
+            // Márgenes mínimos para economizar papel
+            const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+            const pageW = doc.internal.pageSize.getWidth();
+            const margen = 8;
+            const anchoUtil = pageW - (margen * 2);
 
-            let finalY = 50;
-            let totalGeneral = 0;
-            
+            // --- CABECERA: estilo idéntico a la hoja de pedidos ---
+            // Fila superior: Título | Fecha | Cant. Pedidos
+            doc.setFontSize(11);
+            doc.setFont(undefined, 'bold');
+            doc.setTextColor(68, 68, 68); // #444 gris oscuro como en pedidos
+            doc.text('Hoja de Ruta', margen, 12);
+
+            doc.setFontSize(8);
+            doc.setFont(undefined, 'normal');
+            const fechaHoy = new Date().toLocaleDateString('es-AR');
+            doc.text('Fecha: ' + fechaHoy, pageW / 2, 12, { align: 'center' });
+            doc.text('Pedidos: ' + data.length, pageW - margen, 12, { align: 'right' });
+
+            // Localidades
+            const localidades = [...new Set(data.map(p => p.direccion).filter(Boolean))].join(', ');
+            if (localidades) {
+                doc.text('Destinos: ' + localidades, margen, 17);
+            }
+
+            // Línea separadora fina
+            doc.setDrawColor(180, 180, 180); // gris claro
+            doc.setLineWidth(0.3);
+            doc.line(margen, localidades ? 19 : 15, pageW - margen, localidades ? 19 : 15);
+
+            // --- TABLA ---
             const tableData = [];
             data.forEach(pedido => {
-                totalGeneral += Number(pedido.monto_total || 0);
+                // Fila del cliente
                 tableData.push([
-                    `${pedido.nombre_comercio}\n(Ped #${pedido.id})`,
+                    pedido.nombre_comercio + '\n#' + pedido.id,
                     '', // Efectivo
                     '', // Transferencia
                     '', // Debe
                     ''  // Firma
                 ]);
+                // Fila de observaciones
                 tableData.push([
-                    { content: 'Observaciones: ___________________________________________________________', colSpan: 5, styles: { fillColor: [249, 249, 249], fontStyle: 'italic', cellPadding: 4 } }
+                    { content: 'Obs: ____________________________________________', colSpan: 5, styles: { fontSize: 7, fontStyle: 'italic', cellPadding: { top: 1, bottom: 2, left: 2, right: 2 } } }
                 ]);
             });
 
-            // Fila de totales
+            // Fila de TOTALES
             tableData.push([
-                { content: 'TOTALES (A rellenar):', styles: { fontStyle: 'bold' } },
+                { content: 'TOTAL', styles: { fontStyle: 'bold' } },
                 '', '', '', ''
             ]);
 
             doc.autoTable({
-                startY: finalY,
-                head: [['Cliente', 'Efectivo', 'Transferencia', 'Debe', 'Firma de Conformidad']],
+                startY: localidades ? 21 : 17,
+                margin: { left: margen, right: margen },
+                head: [['Cliente', 'Efectivo', 'Transferencia', 'Debe', 'Firma Conform.']],
                 body: tableData,
                 theme: 'grid',
-                headStyles: { fillColor: [59, 130, 246] },
-                columnStyles: {
-                    0: { cellWidth: 50 },
-                    1: { cellWidth: 25 },
-                    2: { cellWidth: 30 },
-                    3: { cellWidth: 25 },
-                    4: { cellWidth: 40 } // Espacio para firma
+                // Sin colores - todo gris como la hoja de pedidos
+                headStyles: { 
+                    fillColor: false, 
+                    textColor: [68, 68, 68],
+                    fontStyle: 'bold',
+                    fontSize: 8,
+                    halign: 'center',
+                    cellPadding: 2,
+                    lineColor: [150, 150, 150],
+                    lineWidth: 0.3
                 },
-                styles: { minCellHeight: 12, valign: 'middle' },
-                didDrawPage: (data) => {
-                    // Agregar pie de página en cada página si se quiere
-                }
+                bodyStyles: {
+                    textColor: [68, 68, 68],
+                    fontSize: 8,
+                    cellPadding: 3,
+                    lineColor: [200, 200, 200],
+                    lineWidth: 0.2
+                },
+                columnStyles: {
+                    0: { cellWidth: anchoUtil * 0.30, halign: 'left' },
+                    1: { cellWidth: anchoUtil * 0.15, halign: 'center' },
+                    2: { cellWidth: anchoUtil * 0.18, halign: 'center' },
+                    3: { cellWidth: anchoUtil * 0.15, halign: 'center' },
+                    4: { cellWidth: anchoUtil * 0.22, halign: 'center' }
+                },
+                styles: { 
+                    minCellHeight: 10,
+                    valign: 'middle',
+                    overflow: 'linebreak'
+                },
+                alternateRowStyles: { fillColor: false }
             });
 
-            const currentY = doc.lastAutoTable.finalY + 30;
-            doc.line(120, currentY, 190, currentY); // Línea para firma
-            doc.text('Firma del Repartidor', 140, currentY + 5);
+            // --- PIE: Firma del repartidor ---
+            const finalY = doc.lastAutoTable.finalY + 15;
+            doc.setDrawColor(150, 150, 150);
+            doc.setLineWidth(0.3);
+            doc.line(pageW - margen - 55, finalY, pageW - margen, finalY);
+            doc.setFontSize(7);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(100, 100, 100);
+            doc.text('Firma del Repartidor', pageW - margen - 27.5, finalY + 4, { align: 'center' });
 
-            doc.save(`Hoja_de_Ruta_${new Date().getTime()}.pdf`);
+            doc.save('Hoja_de_Ruta_' + fechaHoy.replace(/\//g, '-') + '.pdf');
         } catch (error) {
             alert('Error generando PDF: ' + error.message);
         } finally {
