@@ -215,8 +215,8 @@ const ConfiguracionZonasView = () => {
                             return (
                                 <div 
                                     key={fechaStr} 
-                                    onClick={() => abrirModalDia(dia)}
-                                    className={`min-h-[90px] border-b border-r p-1.5 cursor-pointer transition hover:bg-blue-50 ${hoy ? 'bg-blue-50' : ''} ${esPasado ? 'opacity-60' : ''}`}
+                                    onClick={() => !esPasado && abrirModalDia(dia)}
+                                    className={`min-h-[90px] border-b border-r p-1.5 transition ${esPasado ? 'opacity-40 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-blue-50'} ${hoy ? 'bg-blue-50' : ''}`}
                                 >
                                     <div className={`text-xs font-medium mb-1 ${hoy ? 'bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center' : 'text-gray-700'}`}>
                                         {dia.getDate()}
@@ -245,16 +245,37 @@ const ConfiguracionZonasView = () => {
                         </div>
 
                         <div className="p-4 space-y-4">
-                            {/* Zona */}
+                            {/* Zonas predefinidas como chips */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Zona / Localidad</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Zona / Localidad</label>
+                                <div className="flex flex-wrap gap-2 mb-2">
+                                    {['Lules', 'San Pablo', 'Bella Vista', 'García Fernández', 'Famaillá', 'La Reducción', 'Ingenio Lules'].map(zona => {
+                                        const activa = zonaInput.split(',').map(z => z.trim()).includes(zona);
+                                        return (
+                                            <button
+                                                key={zona}
+                                                onClick={() => {
+                                                    const zonas = zonaInput ? zonaInput.split(',').map(z => z.trim()).filter(Boolean) : [];
+                                                    if (activa) {
+                                                        setZonaInput(zonas.filter(z => z !== zona).join(', '));
+                                                    } else {
+                                                        zonas.push(zona);
+                                                        setZonaInput(zonas.join(', '));
+                                                    }
+                                                }}
+                                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition ${activa ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:border-indigo-400'}`}
+                                            >
+                                                {activa ? '✓ ' : ''}{zona}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                                 <input
                                     type="text"
                                     value={zonaInput}
                                     onChange={e => setZonaInput(e.target.value)}
-                                    placeholder="Ej: Lules, San Pablo"
-                                    className="w-full border rounded-lg p-2.5 focus:ring-2 focus:ring-blue-400 focus:outline-none"
-                                    autoFocus
+                                    placeholder="Seleccioná arriba o escribí otro destino"
+                                    className="w-full border rounded-lg p-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
                                     onKeyDown={e => { if (e.key === 'Enter') guardarEvento(); }}
                                 />
                             </div>

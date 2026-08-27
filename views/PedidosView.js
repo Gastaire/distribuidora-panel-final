@@ -54,7 +54,9 @@ const PedidosView = ({ onSelectPedido, user }) => {
         }
     };
 
-    const generarHojaRutaPDF = async () => {
+    const [hojaRutaData, setHojaRutaData] = React.useState(null);
+
+    const generarHojaRuta = async () => {
         setPrintingHojaRuta(true);
         try {
             const res = await fetch(`${API_URL}/pedidos/hoja-ruta`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -67,114 +69,96 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 return;
             }
 
-            // Márgenes mínimos para economizar papel
-            const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-            const pageW = doc.internal.pageSize.getWidth();
-            const margen = 8;
-            const anchoUtil = pageW - (margen * 2);
-
-            // --- CABECERA: estilo idéntico a la hoja de pedidos ---
-            // Fila superior: Título | Fecha | Cant. Pedidos
-            doc.setFontSize(11);
-            doc.setFont(undefined, 'bold');
-            doc.setTextColor(68, 68, 68); // #444 gris oscuro como en pedidos
-            doc.text('Hoja de Ruta', margen, 12);
-
-            doc.setFontSize(8);
-            doc.setFont(undefined, 'normal');
-            const fechaHoy = new Date().toLocaleDateString('es-AR');
-            doc.text('Fecha: ' + fechaHoy, pageW / 2, 12, { align: 'center' });
-            doc.text('Pedidos: ' + data.length, pageW - margen, 12, { align: 'right' });
-
-            // Localidades
-            const localidades = [...new Set(data.map(p => p.direccion).filter(Boolean))].join(', ');
-            if (localidades) {
-                doc.text('Destinos: ' + localidades, margen, 17);
-            }
-
-            // Línea separadora fina
-            doc.setDrawColor(180, 180, 180); // gris claro
-            doc.setLineWidth(0.3);
-            doc.line(margen, localidades ? 19 : 15, pageW - margen, localidades ? 19 : 15);
-
-            // --- TABLA ---
-            const tableData = [];
-            data.forEach(pedido => {
-                // Fila del cliente
-                tableData.push([
-                    pedido.nombre_comercio + '\n#' + pedido.id,
-                    '', // Efectivo
-                    '', // Transferencia
-                    '', // Debe
-                    ''  // Firma
-                ]);
-                // Fila de observaciones
-                tableData.push([
-                    { content: 'Obs: ____________________________________________', colSpan: 5, styles: { fontSize: 7, fontStyle: 'italic', cellPadding: { top: 1, bottom: 2, left: 2, right: 2 } } }
-                ]);
-            });
-
-            // Fila de TOTALES
-            tableData.push([
-                { content: 'TOTAL', styles: { fontStyle: 'bold' } },
-                '', '', '', ''
-            ]);
-
-            doc.autoTable({
-                startY: localidades ? 21 : 17,
-                margin: { left: margen, right: margen },
-                head: [['Cliente', 'Efectivo', 'Transferencia', 'Debe', 'Firma Conform.']],
-                body: tableData,
-                theme: 'grid',
-                // Sin colores - todo gris como la hoja de pedidos
-                headStyles: { 
-                    fillColor: false, 
-                    textColor: [68, 68, 68],
-                    fontStyle: 'bold',
-                    fontSize: 8,
-                    halign: 'center',
-                    cellPadding: 2,
-                    lineColor: [150, 150, 150],
-                    lineWidth: 0.3
-                },
-                bodyStyles: {
-                    textColor: [68, 68, 68],
-                    fontSize: 8,
-                    cellPadding: 3,
-                    lineColor: [200, 200, 200],
-                    lineWidth: 0.2
-                },
-                columnStyles: {
-                    0: { cellWidth: anchoUtil * 0.30, halign: 'left' },
-                    1: { cellWidth: anchoUtil * 0.15, halign: 'center' },
-                    2: { cellWidth: anchoUtil * 0.18, halign: 'center' },
-                    3: { cellWidth: anchoUtil * 0.15, halign: 'center' },
-                    4: { cellWidth: anchoUtil * 0.22, halign: 'center' }
-                },
-                styles: { 
-                    minCellHeight: 10,
-                    valign: 'middle',
-                    overflow: 'linebreak'
-                },
-                alternateRowStyles: { fillColor: false }
-            });
-
-            // --- PIE: Firma del repartidor ---
-            const finalY = doc.lastAutoTable.finalY + 15;
-            doc.setDrawColor(150, 150, 150);
-            doc.setLineWidth(0.3);
-            doc.line(pageW - margen - 55, finalY, pageW - margen, finalY);
-            doc.setFontSize(7);
-            doc.setFont(undefined, 'normal');
-            doc.setTextColor(100, 100, 100);
-            doc.text('Firma del Repartidor', pageW - margen - 27.5, finalY + 4, { align: 'center' });
-
-            doc.save('Hoja_de_Ruta_' + fechaHoy.replace(/\//g, '-') + '.pdf');
+            setHojaRutaData(data);
+            // Esperar a que el DOM renderice el printable div
+            setTimeout(() => {
+                const printArea = document.getElementById('printableHojaRuta');
+                if (printArea) {
+                    printArea.style.display = 'block';
+                    window.print();
+                    printArea.style.display = 'none';
+                }
+                setPrintingHojaRuta(false);
+            }, 200);
         } catch (error) {
-            alert('Error generando PDF: ' + error.message);
-        } finally {
+            alert('Error: ' + error.message);
             setPrintingHojaRuta(false);
         }
+    };
+
+    const HojaRutaPrintable = ({ data }) => {
+        if (!data || data.length === 0) return null;
+        const fechaHoy = new Date().toLocaleDateString('es-AR');
+        const localidades = [...new Set(data.map(p => p.localidad).filter(Boolean))].join(', ');
+
+        return (
+            <div id="printableHojaRuta" className="printable-area hidden font-sans bg-white" style={{ fontSize: '9pt', color: '#444' }}>
+                {/* Cabecera */}
+                <div className="print-header">
+                    <div className="flex justify-between items-start text-sm mb-1">
+                        <div className="w-1/3"><h1 className="text-base font-bold">Hoja de Ruta</h1></div>
+                        <div className="w-1/3 text-center"><span>Fecha: {fechaHoy}</span></div>
+                        <div className="w-1/3 text-right"><span>Pedidos: {data.length}</span></div>
+                    </div>
+                    {localidades && <p className="text-xs mb-1">Destinos: {localidades}</p>}
+                    <hr className="border-gray-400 my-1" />
+                </div>
+
+                {/* Tabla */}
+                <div className="print-body flex-grow">
+                    <table className="w-full border-collapse" style={{ fontSize: '8pt' }}>
+                        <thead>
+                            <tr>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '30%' }}>Cliente</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '14%' }}>Efectivo</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '16%' }}>Transferencia</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '14%' }}>Debe</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '26%' }}>Firma Conform.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map((pedido, idx) => (
+                                <React.Fragment key={pedido.id}>
+                                    {/* Fila del cliente - compacta */}
+                                    <tr>
+                                        <td className="border-b border-gray-200 px-1 py-0.5 text-left">
+                                            <span>{pedido.nombre_comercio}</span>
+                                            <span style={{ fontSize: '7pt', color: '#888', marginLeft: '4px' }}>#{pedido.id}</span>
+                                            {(pedido.horario_atencion || pedido.horario_recepcion) && (
+                                                <div style={{ fontSize: '7pt', color: '#888' }}>
+                                                    {pedido.horario_recepcion ? 'Recep: ' + pedido.horario_recepcion : pedido.horario_atencion ? 'Aten: ' + pedido.horario_atencion : ''}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                    </tr>
+                                    {/* Fila de observaciones */}
+                                    <tr>
+                                        <td colSpan="5" className="border-b border-gray-300 px-1" style={{ fontSize: '7pt', fontStyle: 'italic', paddingTop: '1px', paddingBottom: '3px', color: '#999' }}>
+                                            Obs: ________________________________________
+                                        </td>
+                                    </tr>
+                                </React.Fragment>
+                            ))}
+                            {/* Fila TOTAL */}
+                            <tr>
+                                <td className="border-b border-gray-400 px-1 py-1 font-bold text-center">TOTAL</td>
+                                <td className="border-b border-gray-400 px-1 py-1"></td>
+                                <td className="border-b border-gray-400 px-1 py-1"></td>
+                                <td className="border-b border-gray-400 px-1 py-1"></td>
+                                <td className="border-b border-gray-400 px-1 py-1 text-center" style={{ paddingTop: '12px' }}>
+                                    <div className="border-b border-gray-500 mx-2 mb-0.5"></div>
+                                    <span style={{ fontSize: '7pt', color: '#888' }}>Firma del Repartidor</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
     };
 
     const filteredPedidos = React.useMemo(() => 
@@ -208,7 +192,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                     <h1 className="text-3xl font-bold text-gray-800">Bandeja de Pedidos</h1>
                     {user.rol === 'admin' && (
                         <button 
-                            onClick={generarHojaRutaPDF} 
+                            onClick={generarHojaRuta} 
                             disabled={printingHojaRuta}
                             className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm flex items-center transition"
                         >
@@ -285,6 +269,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 </>
             )}
             {!loading && filteredPedidos.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
+            <HojaRutaPrintable data={hojaRutaData} />
         </div>
     );
 };
