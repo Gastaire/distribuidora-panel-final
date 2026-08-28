@@ -18,9 +18,7 @@ const ReportesView = () => {
     const [orderBy, setOrderBy] = React.useState('cantidad');
     const [filtroCategoria, setFiltroCategoria] = React.useState('');
 
-    // --- Estado de datos ---
     const [resumen, setResumen] = React.useState(null);
-    const [diario, setDiario] = React.useState(null);
     const [vendedores, setVendedores] = React.useState(null);
     const [entregados, setEntregados] = React.useState(null);
     const [inactivos, setInactivos] = React.useState(null);
@@ -29,6 +27,12 @@ const ReportesView = () => {
     const [categorias, setCategorias] = React.useState(null);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
+
+    // Modal de análisis de cliente inactivo
+    const [analisisCliente, setAnalisisCliente] = React.useState(null);   // datos cargados
+    const [loadingAnalisis, setLoadingAnalisis] = React.useState(false);
+    const [errorAnalisis, setErrorAnalisis] = React.useState(null);
+    const [modalClienteId, setModalClienteId] = React.useState(null);
 
     const apiFetch = async (path) => {
         const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
@@ -59,7 +63,7 @@ const ReportesView = () => {
         }
     };
 
-    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria]);
+    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria, diasInactivo]);
 
     const TABS = [
         { id: 'resumen',    label: '📊 Resumen' },
@@ -70,6 +74,203 @@ const ReportesView = () => {
         { id: 'faltantes',  label: '⚠️ Faltantes' },
         { id: 'categorias', label: '📁 Categorías' },
     ];
+
+    // ── Abrir modal de análisis de cliente inactivo ──────────────────────
+    const abrirAnalisis = async (clienteId) => {
+        setModalClienteId(clienteId);
+        setAnalisisCliente(null);
+        setErrorAnalisis(null);
+        setLoadingAnalisis(true);
+        try {
+            const data = await apiFetch(`/reportes/analisis-cliente-inactivo/${clienteId}`);
+            setAnalisisCliente(data);
+        } catch(e) {
+            setErrorAnalisis(e.message);
+        } finally {
+            setLoadingAnalisis(false);
+        }
+    };
+
+    const cerrarAnalisis = () => { setModalClienteId(null); setAnalisisCliente(null); };
+
+    // ── Mini barra de historial mensual (SVG inline) ──────────────────────
+    const MiniBarChart = ({ datos }) => {
+        if (!datos || datos.length === 0) return <span className="text-gray-400 text-xs">Sin datos</span>;
+        const max = Math.max(...datos.map(d => parseInt(d.cantidad_pedidos || 0)), 1);
+        return (
+            <div className="flex items-end gap-0.5 h-10" title="Pedidos por mes (más reciente a la derecha)">
+                {datos.map((d, i) => {
+                    const h = Math.round((parseInt(d.cantidad_pedidos) / max) * 40);
+                    const isRecent = i >= datos.length - 3;
+                    return (
+                        <div
+                            key={d.mes}
+                            title={`${d.mes}: ${d.cantidad_pedidos} pedido(s)`}
+                            style={{ height: `${Math.max(h, 2)}px`, width: '10px' }}
+                            className={`rounded-sm ${isRecent ? 'bg-orange-400' : 'bg-blue-300'}`}
+                        />
+                    );
+                })}
+            </div>
+        );
+    };
+
+    // ── Modal de Análisis completo ────────────────────────────────────────
+    const ModalAnalisisCliente = () => {
+        if (!modalClienteId) return null;
+        const d = analisisCliente;
+        const tendenciaBadge = d ? {
+            'caida_gradual': { label: '📉 Caída gradual de frecuencia', cls: 'bg-red-100 text-red-800' },
+            'leve_baja':     { label: '📉 Leve baja de actividad',       cls: 'bg-amber-100 text-amber-800' },
+            'estable':       { label: '✅ Frecuencia estable',            cls: 'bg-green-100 text-green-800' },
+            'sin_datos':     { label: '🔍 Datos insuficientes',           cls: 'bg-gray-100 text-gray-600' },
+        }[d.tendencia] || {} : {};
+
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={cerrarAnalisis}>
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                    {/* Header */}
+                    <div className="flex justify-between items-center p-5 border-b bg-gray-50 rounded-t-2xl">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800">
+                                {loadingAnalisis ? 'Cargando...' : d?.cliente?.nombre_comercio || 'Análisis de Cliente'}
+                            </h2>
+                            <p className="text-sm text-gray-500">Análisis de causa de inactividad</p>
+                        </div>
+                        <button onClick={cerrarAnalisis} className="text-gray-400 hover:text-gray-700 p-1"><CloseIcon /></button>
+                    </div>
+
+                    <div className="p-5 space-y-5">
+                        {loadingAnalisis && <div className="flex justify-center py-10"><Spinner className="border-blue-500 w-8 h-8" /></div>}
+                        {errorAnalisis  && <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">{errorAnalisis}</div>}
+
+                        {d && !loadingAnalisis && (
+                            <>
+                                {/* Tendencia */}
+                                {tendenciaBadge.label && (
+                                    <div className={`px-4 py-3 rounded-xl font-semibold text-sm ${tendenciaBadge.cls}`}>
+                                        {tendenciaBadge.label}
+                                    </div>
+                                )}
+
+                                {/* Intervalos */}
+                                {d.intervalos && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                                        <div className="bg-gray-50 rounded-xl p-3">
+                                            <p className="text-xs text-gray-500">Total histórico</p>
+                                            <p className="text-xl font-bold">{fmtN(d.intervalos.total_pedidos_historicos)}</p>
+                                            <p className="text-xs text-gray-400">pedidos</p>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-xl p-3">
+                                            <p className="text-xs text-gray-500">Prom. intervalo</p>
+                                            <p className="text-xl font-bold">{d.intervalos.promedio_dias_entre_pedidos ? Math.round(d.intervalos.promedio_dias_entre_pedidos) : '—'}</p>
+                                            <p className="text-xs text-gray-400">días entre pedidos</p>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-xl p-3">
+                                            <p className="text-xs text-gray-500">Primer pedido</p>
+                                            <p className="text-sm font-bold">{d.intervalos.primer_pedido ? new Date(d.intervalos.primer_pedido).toLocaleDateString('es-AR') : '—'}</p>
+                                        </div>
+                                        <div className="bg-gray-50 rounded-xl p-3">
+                                            <p className="text-xs text-gray-500">Último pedido</p>
+                                            <p className="text-sm font-bold text-orange-600">{d.intervalos.ultimo_pedido ? new Date(d.intervalos.ultimo_pedido).toLocaleDateString('es-AR') : '—'}</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Historial mensual */}
+                                {d.historial_mensual && d.historial_mensual.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-700 mb-2">Pedidos por mes (18 meses)</h3>
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full text-xs">
+                                                <thead><tr className="bg-gray-50">
+                                                    <th className="px-3 py-1.5 text-left">Mes</th>
+                                                    <th className="px-3 py-1.5 text-right">Pedidos</th>
+                                                    <th className="px-3 py-1.5 text-right">Monto</th>
+                                                    <th className="px-3 py-1.5 text-left w-24">Vol.</th>
+                                                </tr></thead>
+                                                <tbody className="divide-y">
+                                                    {d.historial_mensual.map((m, i) => {
+                                                        const maxM = Math.max(...d.historial_mensual.map(x => parseInt(x.cantidad_pedidos)), 1);
+                                                        const pct = Math.round((parseInt(m.cantidad_pedidos) / maxM) * 100);
+                                                        const isLast3 = i >= d.historial_mensual.length - 3;
+                                                        return (
+                                                            <tr key={m.mes} className={`${isLast3 ? 'bg-orange-50' : ''}`}>
+                                                                <td className="px-3 py-1.5 font-medium">{m.mes}</td>
+                                                                <td className="px-3 py-1.5 text-right font-bold">{m.cantidad_pedidos}</td>
+                                                                <td className="px-3 py-1.5 text-right text-green-700">${fmt(m.monto_total)}</td>
+                                                                <td className="px-3 py-1.5">
+                                                                    <div className="w-full bg-gray-100 rounded-full h-2">
+                                                                        <div className={`h-2 rounded-full ${isLast3 ? 'bg-orange-400' : 'bg-blue-400'}`} style={{width:`${pct}%`}} />
+                                                                    </div>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Productos que dejó de pedir */}
+                                {d.productos_abandonados && d.productos_abandonados.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-700 mb-2">Productos que dejaron de aparecer en pedidos recientes</h3>
+                                        <div className="space-y-1">
+                                            {d.productos_abandonados.map(p => (
+                                                <div key={p.nombre_producto} className={`flex justify-between items-center px-3 py-2 rounded-lg text-sm ${p.tuvo_faltante ? 'bg-red-50 border border-red-100' : 'bg-gray-50'}`}>
+                                                    <span className="font-medium">{p.nombre_producto}</span>
+                                                    {p.tuvo_faltante
+                                                        ? <span className="text-xs font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-full">⚠️ Faltante ({p.veces_faltante}x)</span>
+                                                        : <span className="text-xs text-gray-400">Sin faltante registrado</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                        {d.productos_abandonados.some(p => p.tuvo_faltante) && (
+                                            <p className="text-xs text-red-600 mt-2 italic">⚠️ Posible causa: uno o más productos que solía pedir tuvieron faltantes.</p>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Productos eliminados de pedidos */}
+                                {d.productos_eliminados_de_pedidos && d.productos_eliminados_de_pedidos.length > 0 && (
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-700 mb-2">Productos removidos de sus pedidos (sin stock)</h3>
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full text-xs">
+                                                <thead><tr className="bg-gray-50">
+                                                    <th className="px-3 py-1.5 text-left">Producto</th>
+                                                    <th className="px-3 py-1.5 text-right">Veces eliminado</th>
+                                                    <th className="px-3 py-1.5 text-right">Unidades</th>
+                                                    <th className="px-3 py-1.5 text-left">Última vez</th>
+                                                </tr></thead>
+                                                <tbody className="divide-y">
+                                                    {d.productos_eliminados_de_pedidos.map(p => (
+                                                        <tr key={p.nombre_producto} className="hover:bg-gray-50">
+                                                            <td className="px-3 py-1.5 font-medium">{p.nombre_producto}</td>
+                                                            <td className="px-3 py-1.5 text-right font-bold text-red-600">{p.veces_eliminado}</td>
+                                                            <td className="px-3 py-1.5 text-right">{p.unidades_eliminadas}</td>
+                                                            <td className="px-3 py-1.5 text-gray-500">{p.ultima_vez ? new Date(p.ultima_vez).toLocaleDateString('es-AR') : '—'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {(!d.productos_abandonados || d.productos_abandonados.length === 0) &&
+                                 (!d.productos_eliminados_de_pedidos || d.productos_eliminados_de_pedidos.length === 0) && (
+                                    <p className="text-sm text-gray-500 italic text-center py-4">No se detectaron productos abandonados o removidos en el período analizado.</p>
+                                )}
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
 
     const ESTADO_COLORS = {
         pendiente: 'bg-yellow-100 text-yellow-800',
@@ -285,11 +486,20 @@ const ReportesView = () => {
         if (!inactivos) return null;
         return (
             <div className="space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-                    <span className="text-2xl">💤</span>
-                    <div>
-                        <p className="font-bold text-amber-800">{fmtN(inactivos.total)} clientes sin pedidos en los últimos {inactivos.dias_sin_pedido} días</p>
-                        <p className="text-sm text-amber-600">Oportunidad de seguimiento comercial.</p>
+                <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <div className="flex items-center gap-3">
+                        <span className="text-2xl">💤</span>
+                        <div>
+                            <p className="font-bold text-amber-800">{fmtN(inactivos.total)} clientes sin pedidos en los últimos {inactivos.dias_sin_pedido} días</p>
+                            <p className="text-sm text-amber-600">Oportunidad de seguimiento comercial.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label className="text-xs font-semibold text-amber-700">Días sin pedido:</label>
+                        <select value={diasInactivo} onChange={e => setDiasInactivo(Number(e.target.value))}
+                            className="border border-amber-300 bg-white rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                            {[7,14,30,60,90].map(d => <option key={d} value={d}>{d} días</option>)}
+                        </select>
                     </div>
                 </div>
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -302,6 +512,7 @@ const ReportesView = () => {
                                     <th className="px-4 py-2 text-left">Teléfono</th>
                                     <th className="px-4 py-2 text-right">Pedidos hist.</th>
                                     <th className="px-4 py-2 text-left">Último pedido</th>
+                                    <th className="px-4 py-2 text-center">Análisis</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
@@ -316,6 +527,14 @@ const ReportesView = () => {
                                                 ? <span className="text-orange-600 font-medium">{new Date(c.ultimo_pedido).toLocaleDateString('es-AR')}</span>
                                                 : <span className="text-red-500 font-medium">Sin pedidos</span>}
                                         </td>
+                                        <td className="px-4 py-2 text-center">
+                                            <button
+                                                onClick={() => abrirAnalisis(c.id)}
+                                                className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-blue-200 transition"
+                                            >
+                                                + Info
+                                            </button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -325,6 +544,7 @@ const ReportesView = () => {
             </div>
         );
     };
+
 
     const TabProductos = () => {
         if (!productos) return null;
@@ -555,6 +775,7 @@ const ReportesView = () => {
     };
 
     return (
+        <React.Fragment>
         <div className="p-4 md:p-6 space-y-4">
             <div>
                 <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
@@ -592,5 +813,7 @@ const ReportesView = () => {
             )}
             {!loading && !error && tabContent[activeTab]}
         </div>
+        <ModalAnalisisCliente />
+        </React.Fragment>
     );
 };
