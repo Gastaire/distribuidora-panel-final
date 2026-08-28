@@ -877,7 +877,6 @@
                     default:
                         return <DashboardView onShowImportVentasModal={onShowImportVentasModal} />;
                 }
-                }
             };
 
             return (
