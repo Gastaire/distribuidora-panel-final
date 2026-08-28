@@ -303,22 +303,18 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 <div>
                     <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
                     <input
-                        type="text" placeholder="DD/MM/YYYY"
-                        onFocus={e => e.target.type = 'date'}
-                        onBlur={e => { e.target.type = 'text'; if (e.target.value) { const [y,m,d]=e.target.value.split('-'); e.target.value=`${d}/${m}/${y}`; } }}
-                        defaultValue={startDate.split('-').reverse().join('/')}
-                        onChange={e => { if(e.target.type==='date') setStartDate(e.target.value); }}
+                        type="date"
+                        value={startDate}
+                        onChange={e => setStartDate(e.target.value)}
                         className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36 bg-gray-50"
                     />
                 </div>
                 <div>
                     <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
                     <input
-                        type="text" placeholder="DD/MM/YYYY"
-                        onFocus={e => e.target.type = 'date'}
-                        onBlur={e => { e.target.type = 'text'; if (e.target.value) { const [y,m,d]=e.target.value.split('-'); e.target.value=`${d}/${m}/${y}`; } }}
-                        defaultValue={endDate.split('-').reverse().join('/')}
-                        onChange={e => { if(e.target.type==='date') setEndDate(e.target.value); }}
+                        type="date"
+                        value={endDate}
+                        onChange={e => setEndDate(e.target.value)}
                         className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36 bg-gray-50"
                     />
                 </div>
@@ -398,9 +394,8 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                                 </div>
                             </div>
                             <div className="relative" style={{ height: '240px' }}>
-                                {stats.evolucion_semanal && stats.evolucion_semanal.length > 0
-                                    ? <canvas ref={evolucionRef}></canvas>
-                                    : noDataMsg('Sin datos de evolución para el período')}
+                                <canvas ref={evolucionRef} style={{ display: (stats.evolucion_semanal && stats.evolucion_semanal.length > 0) ? 'block' : 'none' }}></canvas>
+                                {!(stats.evolucion_semanal && stats.evolucion_semanal.length > 0) && noDataMsg('Sin datos de evolución para el período')}
                             </div>
                             <p className="text-xs text-gray-400 mt-3 italic border-t pt-2">
                                 ℹ️ Para un análisis preciso de crecimiento real, comparar contra el índice de inflación del período y la variación salarial correspondiente.
@@ -417,9 +412,8 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                             </div>
                             <p className="text-xs text-gray-400 mb-3">Productos con mayor volumen en el rango seleccionado</p>
                             <div className="relative flex-1" style={{ minHeight: '300px' }}>
-                                {stats.topProducts && stats.topProducts.length > 0
-                                    ? <canvas ref={topProductsRef}></canvas>
-                                    : noDataMsg()}
+                                <canvas ref={topProductsRef} style={{ display: (stats.topProducts && stats.topProducts.length > 0) ? 'block' : 'none' }}></canvas>
+                                {!(stats.topProducts && stats.topProducts.length > 0) && noDataMsg()}
                             </div>
                         </div>
 
@@ -430,10 +424,9 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                             </div>
                             <p className="text-xs text-gray-400 mb-3">Productos más removidos por sin-stock</p>
                             <div className="relative flex-1" style={{ minHeight: '300px' }}>
+                                <canvas ref={topFaltantesRef} style={{ display: (dataSource === 'pedidos' && stats.topFaltantes && stats.topFaltantes.length > 0) ? 'block' : 'none' }}></canvas>
                                 {dataSource === 'pedidos'
-                                    ? (stats.topFaltantes && stats.topFaltantes.length > 0
-                                        ? <canvas ref={topFaltantesRef}></canvas>
-                                        : noDataMsg('Sin faltantes registrados en este período ✓'))
+                                    ? (!(stats.topFaltantes && stats.topFaltantes.length > 0) && noDataMsg('Sin faltantes registrados en este período ✓'))
                                     : noDataMsg('Solo disponible para la fuente App')}
                             </div>
                         </div>

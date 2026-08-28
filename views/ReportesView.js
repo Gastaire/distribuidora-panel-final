@@ -15,7 +15,7 @@ const ReportesView = () => {
     const [startDate, setStartDate] = React.useState(inicioSemana);
     const [endDate, setEndDate] = React.useState(hoy);
     const [diasInactivo, setDiasInactivo] = React.useState(30);
-    const [orderBy, setOrderBy] = React.useState('cantidad');
+    const [orderBy, setOrderBy] = React.useState('cantidad'); // backend sort for productos
     const [filtroCategoria, setFiltroCategoria] = React.useState('');
 
     const [resumen, setResumen] = React.useState(null);
@@ -306,42 +306,36 @@ const ReportesView = () => {
     };
 
     // ─── Filtros comunes ───
-    const FiltroFechas = () => (
-        <div className="flex flex-wrap items-end gap-3 bg-white border rounded-xl p-4 mb-6 shadow-sm">
-            <div>
-                <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
-                <input type="text" placeholder="DD/MM/YYYY" defaultValue={startDate ? startDate.split('-').reverse().join('/') : ''} onFocus={e => e.target.type = 'date'} onBlur={e => { e.target.type = 'text'; if(e.target.value) { const [y,m,d] = e.target.value.split('-'); e.target.value = `${d}/${m}/${y}`; } }} onChange={e => { if(e.target.type === 'date') setStartDate(e.target.value); }}
-                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
-            </div>
-            <div>
-                <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
-                <input type="text" placeholder="DD/MM/YYYY" defaultValue={endDate ? endDate.split('-').reverse().join('/') : ''} onFocus={e => e.target.type = 'date'} onBlur={e => { e.target.type = 'text'; if(e.target.value) { const [y,m,d] = e.target.value.split('-'); e.target.value = `${d}/${m}/${y}`; } }} onChange={e => { if(e.target.type === 'date') setEndDate(e.target.value); }}
-                    className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
-            </div>
-            {activeTab === 'inactivos' && (
+    const FiltroFechas = () => {
+        if (activeTab === 'inactivos') return null; // Inactivos usa solo Días y se maneja internamente en la tab
+        return (
+            <div className="flex flex-wrap items-end gap-3 bg-white border rounded-xl p-4 mb-6 shadow-sm">
                 <div>
-                    <label className="text-xs font-semibold text-gray-500 block mb-1">Días sin pedido</label>
-                    <select value={diasInactivo} onChange={e => setDiasInactivo(e.target.value)}
-                        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        {[7,14,30,60,90].map(d => <option key={d} value={d}>{d} días</option>)}
-                    </select>
+                    <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
                 </div>
-            )}
-            {activeTab === 'productos' && (
                 <div>
-                    <label className="text-xs font-semibold text-gray-500 block mb-1">Ordenar por</label>
-                    <select value={orderBy} onChange={e => setOrderBy(e.target.value)}
-                        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-                        <option value="cantidad">Unidades vendidas</option>
-                        <option value="monto">Monto generado</option>
-                    </select>
+                    <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
                 </div>
-            )}
-            <button onClick={cargar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition">
-                Consultar
-            </button>
-        </div>
-    );
+                {activeTab === 'productos' && (
+                    <div>
+                        <label className="text-xs font-semibold text-gray-500 block mb-1">Ordenar por</label>
+                        <select value={orderBy} onChange={e => setOrderBy(e.target.value)}
+                            className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                            <option value="cantidad">Unidades vendidas</option>
+                            <option value="monto">Monto generado</option>
+                        </select>
+                    </div>
+                )}
+                <button onClick={cargar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition">
+                    Consultar
+                </button>
+            </div>
+        );
+    };
 
     // ─── Contenido por tab ───
 
@@ -395,6 +389,7 @@ const ReportesView = () => {
 
     const TabVendedores = () => {
         if (!vendedores) return null;
+        const { items: sorted, requestSort, sortConfig } = useSortableData(vendedores.vendedores, { key: 'monto_total', direction: 'descending' });
         return (
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                 <div className="px-5 py-3 border-b bg-gray-50">
@@ -404,19 +399,17 @@ const ReportesView = () => {
                     <table className="min-w-full text-sm">
                         <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                             <tr>
-                                <th className="px-4 py-2 text-left">#</th>
-                                <th className="px-4 py-2 text-left">Vendedor</th>
-                                <th className="px-4 py-2 text-right">Pedidos</th>
-                                <th className="px-4 py-2 text-right">Clientes únicos</th>
-                                <th className="px-4 py-2 text-right">Unidades</th>
-                                <th className="px-4 py-2 text-right">Ticket prom.</th>
-                                <th className="px-4 py-2 text-right">Monto total</th>
+                                <TableHeader sortKey="vendedor" sortConfig={sortConfig} onSort={requestSort}>Vendedor</TableHeader>
+                                <TableHeader sortKey="total_pedidos" sortConfig={sortConfig} onSort={requestSort} className="text-right">Pedidos</TableHeader>
+                                <TableHeader sortKey="clientes_unicos" sortConfig={sortConfig} onSort={requestSort} className="text-right">Clientes únicos</TableHeader>
+                                <TableHeader sortKey="unidades_vendidas" sortConfig={sortConfig} onSort={requestSort} className="text-right">Unidades</TableHeader>
+                                <TableHeader sortKey="ticket_promedio" sortConfig={sortConfig} onSort={requestSort} className="text-right">Ticket prom.</TableHeader>
+                                <TableHeader sortKey="monto_total" sortConfig={sortConfig} onSort={requestSort} className="text-right">Monto total</TableHeader>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {vendedores.vendedores.map((v, i) => (
+                            {sorted.map((v, i) => (
                                 <tr key={v.vendedor_id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3 text-gray-400 font-bold">{i + 1}</td>
                                     <td className="px-4 py-3 font-semibold text-gray-800">{v.vendedor}</td>
                                     <td className="px-4 py-3 text-right">{fmtN(v.total_pedidos)}</td>
                                     <td className="px-4 py-3 text-right">{fmtN(v.clientes_unicos)}</td>
@@ -548,6 +541,7 @@ const ReportesView = () => {
 
     const TabProductos = () => {
         if (!productos) return null;
+        const { items: sorted, requestSort, sortConfig } = useSortableData(productos.productos, { key: 'unidades_vendidas', direction: 'descending' });
         return (
             <div className="space-y-4">
                 {filtroCategoria && (
@@ -558,24 +552,24 @@ const ReportesView = () => {
                 )}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="px-5 py-3 border-b bg-gray-50 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700">Top {productos.total_productos} productos — ordenados por {productos.order_by === 'monto' ? 'monto' : 'unidades'}</h3>
+                    <h3 className="font-bold text-gray-700">Top {productos.total_productos} productos — ordenados por {productos.order_by === 'monto' ? 'monto (backend)' : 'unidades (backend)'}</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                         <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                             <tr>
                                 <th className="px-4 py-2 text-left">#</th>
-                                <th className="px-4 py-2 text-left">Producto</th>
-                                <th className="px-4 py-2 text-left">Categoría</th>
-                                <th className="px-4 py-2 text-left">SKU</th>
-                                <th className="px-4 py-2 text-right">Unidades</th>
-                                <th className="px-4 py-2 text-right">En pedidos</th>
-                                <th className="px-4 py-2 text-right">Precio prom.</th>
-                                <th className="px-4 py-2 text-right">Monto total</th>
+                                <TableHeader sortKey="nombre_producto" sortConfig={sortConfig} onSort={requestSort}>Producto</TableHeader>
+                                <TableHeader sortKey="categoria" sortConfig={sortConfig} onSort={requestSort}>Categoría</TableHeader>
+                                <TableHeader sortKey="codigo_sku" sortConfig={sortConfig} onSort={requestSort}>SKU</TableHeader>
+                                <TableHeader sortKey="unidades_vendidas" sortConfig={sortConfig} onSort={requestSort} className="text-right">Unidades</TableHeader>
+                                <TableHeader sortKey="aparece_en_pedidos" sortConfig={sortConfig} onSort={requestSort} className="text-right">En pedidos</TableHeader>
+                                <TableHeader sortKey="precio_promedio" sortConfig={sortConfig} onSort={requestSort} className="text-right">Precio prom.</TableHeader>
+                                <TableHeader sortKey="monto_total" sortConfig={sortConfig} onSort={requestSort} className="text-right">Monto total</TableHeader>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {productos.productos.map((p, i) => (
+                            {sorted.map((p, i) => (
                                 <tr key={p.producto_id} className="hover:bg-gray-50">
                                     <td className="px-4 py-2 text-gray-400 font-bold">{i + 1}</td>
                                     <td className="px-4 py-2 font-semibold text-gray-800">{p.nombre_producto}</td>
