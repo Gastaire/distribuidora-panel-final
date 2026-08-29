@@ -134,7 +134,8 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
             </div>
             
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* Vista tabla — Desktop */}
+                <div className="hidden md:block overflow-x-auto">
                     {loading && <div className="p-6 flex justify-center"><Spinner className="border-blue-500"/></div>}
                     {error && <p className="p-6 text-red-500">{error}</p>}
                     {!loading && !error && (
@@ -154,9 +155,7 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{producto.nombre}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{producto.categoria || '-'}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">${producto.precio_unitario}</td>
-                                        {/* --- INICIO DE LA MODIFICACIÓN: Usar StockBadge --- */}
                                         <td className="px-6 py-4 text-sm"><StockBadge producto={producto} /></td>
-                                        {/* --- FIN DE LA MODIFICACIÓN --- */}
                                         {isAdmin && (
                                             <td className="px-6 py-4 text-right text-sm font-medium space-x-4">
                                                 <a href="#" onClick={(e) => { e.preventDefault(); onShowProductoForm(producto); }} className="text-blue-600 hover:text-blue-900">Editar</a>
@@ -173,6 +172,45 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                         </table>
                     )}
                     {!loading && filteredProductos.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
+                </div>
+
+                {/* Vista cards — Móvil */}
+                <div className="md:hidden">
+                    {loading && <div className="p-4 flex justify-center"><Spinner className="border-blue-500"/></div>}
+                    {error && <p className="p-4 text-red-500">{error}</p>}
+                    {!loading && !error && (
+                        <div className="divide-y divide-gray-100">
+                            {filteredProductos.map((producto) => (
+                                <div key={producto.id} className={`flex items-center gap-3 p-4 ${producto.archivado ? 'opacity-50 bg-gray-50' : 'bg-white'}`}>
+                                    <img
+                                        src={producto.imagen_url || 'https://placehold.co/400x400/e2e8f0/e2e8f0?text=...'}
+                                        alt={producto.nombre}
+                                        className="h-14 w-14 rounded-lg object-cover shrink-0"
+                                        onError={(e) => { e.target.onerror = null; e.target.src='https://placehold.co/400x400/e2e8f0/e2e8f0?text=...'; }}
+                                    />
+                                    <div className="flex-grow min-w-0">
+                                        <p className="font-semibold text-gray-900 text-sm truncate">{producto.nombre}</p>
+                                        <p className="text-xs text-gray-500">{producto.categoria || 'Sin categoría'}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-sm font-bold text-gray-800">${producto.precio_unitario}</span>
+                                            <StockBadge producto={producto} />
+                                        </div>
+                                    </div>
+                                    {isAdmin && (
+                                        <div className="flex flex-col gap-1 shrink-0 text-xs">
+                                            <button onClick={() => onShowProductoForm(producto)} className="text-blue-600 font-semibold py-1 px-2 rounded bg-blue-50">Editar</button>
+                                            {producto.archivado ? (
+                                                <button onClick={() => setConfirmRestore(producto)} className="text-green-600 font-semibold py-1 px-2 rounded bg-green-50">Restaurar</button>
+                                            ) : (
+                                                <button onClick={() => setConfirmArchive(producto)} className="text-red-500 font-semibold py-1 px-2 rounded bg-red-50">Archivar</button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {filteredProductos.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

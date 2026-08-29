@@ -32,10 +32,12 @@ const useSortableData = (items, config = null, numericSort = false) => {
                 }
                 // --- FIN DE LA MODIFICACIÓN ---
 
-                // --- Lógica de ordenamiento numérico ---
-                if (numericSort && (sortConfig.key === 'total_monto' || sortConfig.key === 'total_cantidad' || sortConfig.key === 'id')) {
-                    const numA = parseFloat(valA);
-                    const numB = parseFloat(valB);
+                // --- Lógica de ordenamiento automático (números vs texto) ---
+                const numA = Number(valA);
+                const numB = Number(valB);
+
+                // Si ambos valores se pueden parsear como números válidos (y no son strings vacíos o null)
+                if (valA !== '' && valA !== null && valB !== '' && valB !== null && !isNaN(numA) && !isNaN(numB)) {
                     if (numA < numB) return sortConfig.direction === 'ascending' ? -1 : 1;
                     if (numA > numB) return sortConfig.direction === 'ascending' ? 1 : -1;
                     return 0;

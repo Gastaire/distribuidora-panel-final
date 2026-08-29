@@ -18,25 +18,42 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [showArchived, setShowArchived] = React.useState(false);
     const [confirmAction, setConfirmAction] = React.useState({ action: null, pedido: null });
+    const [printingHojaRuta, setPrintingHojaRuta] = React.useState(false);
     const token = localStorage.getItem('token');
     const { items: sortedPedidos, requestSort, sortConfig } = useSortableData(pedidos, { key: 'id', direction: 'descending' });
 
-    const fetchPedidos = React.useCallback(async () => {
+    const fetchPedidos = React.useCallback(async (signal) => {
         setLoading(true);
         setError(null);
+        const isSignal = signal instanceof AbortSignal;
         try {
-            const response = await fetch(`${API_URL}/pedidos`, { headers: { 'Authorization': `Bearer ${token}` } });
+            const fetchOptions = { headers: { 'Authorization': `Bearer ${token}` } };
+            if (isSignal) {
+                fetchOptions.signal = signal;
+            }
+            const response = await fetch(`${API_URL}/pedidos`, fetchOptions);
             if (!response.ok) throw new Error('No se pudo obtener la lista de pedidos.');
-            setPedidos(await response.json());
+            const data = await response.json();
+            if (!isSignal || !signal.aborted) {
+                setPedidos(data);
+            }
         } catch (err) {
-            setError(err.message);
+            if (err.name !== 'AbortError') {
+                setError(err.message);
+            }
         } finally {
-            setLoading(false);
+            if (!isSignal || !signal.aborted) {
+                setLoading(false);
+            }
         }
     }, [token]);
 
     React.useEffect(() => {
-        fetchPedidos();
+        const controller = new AbortController();
+        fetchPedidos(controller.signal);
+        return () => {
+            controller.abort();
+        };
     }, [fetchPedidos]);
 
     const handleActionConfirm = async () => {
@@ -51,6 +68,113 @@ const PedidosView = ({ onSelectPedido, user }) => {
             alert(`Error al ejecutar la acción: ${err.message}`);
             setConfirmAction({ action: null, pedido: null });
         }
+    };
+
+    const [hojaRutaData, setHojaRutaData] = React.useState(null);
+
+    const generarHojaRuta = async () => {
+        setPrintingHojaRuta(true);
+        try {
+            const res = await fetch(`${API_URL}/pedidos/hoja-ruta`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error('Error al obtener datos para hoja de ruta');
+            const data = await res.json();
+            
+            if (data.length === 0) {
+                alert('No hay pedidos facturados en las últimas 6 horas.');
+                setPrintingHojaRuta(false);
+                return;
+            }
+
+            setHojaRutaData(data);
+            // Esperar a que el DOM renderice el printable div
+            setTimeout(() => {
+                const printArea = document.getElementById('printableHojaRuta');
+                if (printArea) {
+                    printArea.style.display = 'block';
+                    window.print();
+                    printArea.style.display = 'none';
+                }
+                setPrintingHojaRuta(false);
+            }, 200);
+        } catch (error) {
+            alert('Error: ' + error.message);
+            setPrintingHojaRuta(false);
+        }
+    };
+
+    const HojaRutaPrintable = ({ data }) => {
+        if (!data || data.length === 0) return null;
+        const fechaHoy = new Date().toLocaleDateString('es-AR');
+        const localidades = [...new Set(data.map(p => p.localidad).filter(Boolean))].join(', ');
+
+        return (
+            <div id="printableHojaRuta" className="printable-area hidden font-sans bg-white" style={{ fontSize: '9pt', color: '#444' }}>
+                {/* Cabecera */}
+                <div className="print-header">
+                    <div className="flex justify-between items-start text-sm mb-1">
+                        <div className="w-1/3"><h1 className="text-base font-bold">Hoja de Ruta</h1></div>
+                        <div className="w-1/3 text-center"><span>Fecha: {fechaHoy}</span></div>
+                        <div className="w-1/3 text-right"><span>Pedidos: {data.length}</span></div>
+                    </div>
+                    {localidades && <p className="text-xs mb-1">Destinos: {localidades}</p>}
+                    <hr className="border-gray-400 my-1" />
+                </div>
+
+                {/* Tabla */}
+                <div className="print-body flex-grow">
+                    <table className="w-full border-collapse" style={{ fontSize: '8pt' }}>
+                        <thead>
+                            <tr>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '30%' }}>Cliente</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '14%' }}>Efectivo</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '16%' }}>Transferencia</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '14%' }}>Debe</th>
+                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '26%' }}>Firma Conform.</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map((pedido, idx) => (
+                                <React.Fragment key={pedido.id}>
+                                    {/* Fila del cliente - compacta */}
+                                    <tr>
+                                        <td className="border-b border-gray-200 px-1 py-0.5 text-left">
+                                            <span>{pedido.nombre_comercio}</span>
+                                            <span style={{ fontSize: '7pt', color: '#888', marginLeft: '4px' }}>#{pedido.id}</span>
+                                            {(pedido.horario_atencion || pedido.horario_recepcion) && (
+                                                <div style={{ fontSize: '7pt', color: '#888' }}>
+                                                    {pedido.horario_recepcion ? 'Recep: ' + pedido.horario_recepcion : pedido.horario_atencion ? 'Aten: ' + pedido.horario_atencion : ''}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
+                                    </tr>
+                                    {/* Fila de observaciones */}
+                                    <tr>
+                                        <td colSpan="5" className="border-b border-gray-300 px-1" style={{ fontSize: '7pt', fontStyle: 'italic', paddingTop: '1px', paddingBottom: '3px', color: '#999' }}>
+                                            Obs: ________________________________________
+                                        </td>
+                                    </tr>
+                                </React.Fragment>
+                            ))}
+                            {/* Fila TOTAL */}
+                            <tr>
+                                <td className="border-b border-gray-400 px-1 py-1 font-bold text-center">TOTAL</td>
+                                <td className="border-b border-gray-400 px-1 py-1"></td>
+                                <td className="border-b border-gray-400 px-1 py-1"></td>
+                                <td className="border-b border-gray-400 px-1 py-1"></td>
+                                <td className="border-b border-gray-400 px-1 py-1 text-center" style={{ paddingTop: '12px' }}>
+                                    <div className="border-b border-gray-500 mx-2 mb-0.5"></div>
+                                    <span style={{ fontSize: '7pt', color: '#888' }}>Firma del Repartidor</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        );
     };
 
     const filteredPedidos = React.useMemo(() => 
@@ -80,7 +204,18 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 />
             )}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <h1 className="text-3xl font-bold text-gray-800 shrink-0">Bandeja de Pedidos</h1>
+                <div className="flex items-center gap-4 shrink-0">
+                    <h1 className="text-3xl font-bold text-gray-800">Bandeja de Pedidos</h1>
+                    {user.rol === 'admin' && (
+                        <button 
+                            onClick={generarHojaRuta} 
+                            disabled={printingHojaRuta}
+                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm flex items-center transition"
+                        >
+                            {printingHojaRuta ? <Spinner className="w-5 h-5 mr-2 border-white" /> : '📄 Imprimir Hoja de Ruta'}
+                        </button>
+                    )}
+                </div>
                 <div className="w-full flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-4">
                     <div className="flex items-center justify-between sm:justify-end gap-4">
                         <div className="flex items-center gap-2">
@@ -150,6 +285,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 </>
             )}
             {!loading && filteredPedidos.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
+            <HojaRutaPrintable data={hojaRutaData} />
         </div>
     );
 };

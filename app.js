@@ -829,10 +829,13 @@
             const isAdmin = user.rol === 'admin';
 
             const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
+            const [isAdminOpen, setIsAdminOpen] = React.useState(
+                ['usuarios', 'actividad'].includes(currentPage)
+            );
             
             const handleNavItemClick = (page) => {
                 setCurrentPage(page);
-                setIsSidebarOpen(false); // Cierra el menú al seleccionar una opción
+                setIsSidebarOpen(false);
             };
             
             const renderContent = () => {
@@ -864,12 +867,12 @@
                         return <UsuariosView onShowUsuarioForm={onShowUsuarioForm} />;
                     case 'actividad': 
                         return <ActividadView />;
-                    case 'analisis':
-                        return <AnalyticsView allCategories={categorias} />;
-                    // --- INICIO DE LA MODIFICACIÓN ---
                     case 'integridad':
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
-                    // --- FIN DE LA MODIFICACIÓN ---
+                    case 'reportes':
+                        return <ReportesView />;
+                    case 'zonas':
+                        return <ConfiguracionZonasView />;
                     case 'dashboard': 
                     default:
                         return <DashboardView onShowImportVentasModal={onShowImportVentasModal} />;
@@ -892,16 +895,42 @@
                             <PackageIcon className="h-8 w-8 mr-2" />
                             <span className="text-xl font-bold">Distribuidora</span>
                         </div>
-                        <nav className="flex-1 px-4 py-6 space-y-2">
+                        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
                             <NavItem icon={<HomeIcon />} text="Dashboard" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
-                            {isAdmin && <NavItem icon={<ChartBarIcon />} text="Análisis" active={currentPage === 'analisis'} onClick={() => handleNavItemClick('analisis')} />}
                             <NavItem icon={<ShoppingCartIcon />} text="Pedidos" active={currentPage === 'pedidos'} onClick={() => handleNavItemClick('pedidos')} />
+                            {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
                             {isAdmin && <NavItem icon={<TagIcon />} text="Categorías" active={currentPage === 'categorias'} onClick={() => handleNavItemClick('categorias')} />}
                             <NavItem icon={<UsersIcon />} text="Clientes" active={currentPage === 'clientes'} onClick={() => handleNavItemClick('clientes')} />
-                            {isAdmin && <NavItem icon={<UsersIcon />} text="Usuarios" active={currentPage === 'usuarios'} onClick={() => handleNavItemClick('usuarios')} />}
-                            {isAdmin && <NavItem icon={<ActivityIcon />} text="Actividad" active={currentPage === 'actividad'} onClick={() => handleNavItemClick('actividad')} />}
-                            {isAdmin && <NavItem icon={<ShieldWarningIcon />} text="Integridad" active={currentPage === 'integridad'} onClick={() => handleNavItemClick('integridad')} />}
+                            {isAdmin && <NavItem icon={<MapPinIcon />} text="Zonas" active={currentPage === 'zonas'} onClick={() => handleNavItemClick('zonas')} />}
+
+                            {/* Grupo Administración colapsable — solo admin */}
+                            {isAdmin && (
+                                <div>
+                                    <button
+                                        onClick={() => setIsAdminOpen(o => !o)}
+                                        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors mt-2 ${
+                                            ['usuarios','actividad'].includes(currentPage)
+                                                ? 'bg-blue-600 text-white'
+                                                : 'text-gray-400 hover:text-white hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <span className="flex items-center gap-2">
+                                            <ShieldWarningIcon className="h-5 w-5" />
+                                            Administración
+                                        </span>
+                                        <svg className={`h-4 w-4 transition-transform ${isAdminOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+                                    {isAdminOpen && (
+                                        <div className="ml-4 mt-1 space-y-1 border-l border-gray-600 pl-2">
+                                            <NavItem icon={<UsersIcon />} text="Usuarios" active={currentPage === 'usuarios'} onClick={() => handleNavItemClick('usuarios')} />
+                                            <NavItem icon={<ActivityIcon />} text="Actividad" active={currentPage === 'actividad'} onClick={() => handleNavItemClick('actividad')} />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </nav>
                         <div className="px-4 py-6 border-t border-gray-700">
                             <div className="mb-4"><p className="text-sm font-semibold">{user.nombre}</p><p className="text-xs text-gray-400 capitalize">{user.rol}</p></div>
