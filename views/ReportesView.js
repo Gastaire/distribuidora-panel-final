@@ -477,6 +477,7 @@ const ReportesView = () => {
 
     const TabInactivos = () => {
         if (!inactivos) return null;
+        const { items: sorted, requestSort, sortConfig } = useSortableData(inactivos.clientes, { key: 'ultimo_pedido', direction: 'ascending' });
         return (
             <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
@@ -500,16 +501,16 @@ const ReportesView = () => {
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                                 <tr>
-                                    <th className="px-4 py-2 text-left">Cliente</th>
-                                    <th className="px-4 py-2 text-left">Contacto</th>
-                                    <th className="px-4 py-2 text-left">Teléfono</th>
-                                    <th className="px-4 py-2 text-right">Pedidos hist.</th>
-                                    <th className="px-4 py-2 text-left">Último pedido</th>
+                                    <TableHeader sortKey="nombre_comercio" sortConfig={sortConfig} onSort={requestSort}>Cliente</TableHeader>
+                                    <TableHeader sortKey="nombre_contacto" sortConfig={sortConfig} onSort={requestSort}>Contacto</TableHeader>
+                                    <TableHeader sortKey="telefono" sortConfig={sortConfig} onSort={requestSort}>Teléfono</TableHeader>
+                                    <TableHeader sortKey="total_pedidos_historicos" sortConfig={sortConfig} onSort={requestSort} className="text-right">Pedidos hist.</TableHeader>
+                                    <TableHeader sortKey="ultimo_pedido" sortConfig={sortConfig} onSort={requestSort}>Último pedido</TableHeader>
                                     <th className="px-4 py-2 text-center">Análisis</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {inactivos.clientes.map(c => (
+                                {sorted.map(c => (
                                     <tr key={c.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2 font-semibold">{c.nombre_comercio}</td>
                                         <td className="px-4 py-2 text-gray-600">{c.nombre_contacto || '—'}</td>
@@ -591,6 +592,10 @@ const ReportesView = () => {
 
     const TabFaltantes = () => {
         if (!faltantes) return null;
+        
+        const { items: sortedResumen, requestSort: requestSortResumen, sortConfig: sortConfigResumen } = useSortableData(faltantes.resumen_por_producto, { key: 'total_faltante', direction: 'descending' });
+        const { items: sortedRegistros, requestSort: requestSortRegistros, sortConfig: sortConfigRegistros } = useSortableData(faltantes.registros, { key: 'fecha_registro', direction: 'descending' });
+
         return (
             <div className="space-y-6">
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -600,13 +605,13 @@ const ReportesView = () => {
                     <table className="min-w-full text-sm">
                         <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                             <tr>
-                                <th className="px-4 py-2 text-left">Producto</th>
-                                <th className="px-4 py-2 text-right">Total removido</th>
-                                <th className="px-4 py-2 text-right">Veces removido</th>
+                                <TableHeader sortKey="nombre_producto" sortConfig={sortConfigResumen} onSort={requestSortResumen}>Producto</TableHeader>
+                                <TableHeader sortKey="total_faltante" sortConfig={sortConfigResumen} onSort={requestSortResumen} className="text-right">Total removido</TableHeader>
+                                <TableHeader sortKey="veces_removido" sortConfig={sortConfigResumen} onSort={requestSortResumen} className="text-right">Veces removido</TableHeader>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {faltantes.resumen_por_producto.map(f => (
+                            {sortedResumen.map(f => (
                                 <tr key={f.nombre_producto} className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-semibold">{f.nombre_producto}</td>
                                     <td className="px-4 py-2 text-right font-bold text-red-600">{fmtN(f.total_faltante)}</td>
@@ -627,15 +632,15 @@ const ReportesView = () => {
                         <table className="min-w-full text-sm">
                             <thead className="bg-gray-50 text-xs uppercase text-gray-500">
                                 <tr>
-                                    <th className="px-4 py-2 text-left">Pedido</th>
-                                    <th className="px-4 py-2 text-left">Producto</th>
-                                    <th className="px-4 py-2 text-right">Cant. original</th>
-                                    <th className="px-4 py-2 text-left">Modificado por</th>
-                                    <th className="px-4 py-2 text-left">Fecha</th>
+                                    <TableHeader sortKey="pedido_id" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Pedido</TableHeader>
+                                    <TableHeader sortKey="nombre_producto" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Producto</TableHeader>
+                                    <TableHeader sortKey="cantidad_original" sortConfig={sortConfigRegistros} onSort={requestSortRegistros} className="text-right">Cant. original</TableHeader>
+                                    <TableHeader sortKey="modificado_por" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Modificado por</TableHeader>
+                                    <TableHeader sortKey="fecha_registro" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Fecha</TableHeader>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {faltantes.registros.map(r => (
+                                {sortedRegistros.map(r => (
                                     <tr key={r.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2 font-bold text-blue-600">#{r.pedido_id}</td>
                                         <td className="px-4 py-2">{r.nombre_producto}</td>
