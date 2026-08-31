@@ -12,7 +12,11 @@
  */
 
 const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
-    const [formData, setFormData] = React.useState({ nombre_comercio: '', nombre_contacto: '', direccion: '', telefono: '', vendedor_id: '', vendedor_nombre: '' });
+    const [formData, setFormData] = React.useState({ 
+        nombre_comercio: '', nombre_contacto: '', direccion: '', telefono: '', 
+        vendedor_id: '', vendedor_nombre: '', latitud: '', longitud: '', 
+        horario_atencion: '', horario_entrega: '' 
+    });
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [vendedores, setVendedores] = React.useState([]);
@@ -21,9 +25,24 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
 
     React.useEffect(() => { 
         if (isEditing) { 
-            setFormData({ nombre_comercio: cliente.nombre_comercio || '', nombre_contacto: cliente.nombre_contacto || '', direccion: cliente.direccion || '', telefono: cliente.telefono || '', vendedor_id: cliente.vendedor_id || '', vendedor_nombre: cliente.vendedor_nombre || '' }); 
+            setFormData({ 
+                nombre_comercio: cliente.nombre_comercio || '', 
+                nombre_contacto: cliente.nombre_contacto || '', 
+                direccion: cliente.direccion || '', 
+                telefono: cliente.telefono || '', 
+                vendedor_id: cliente.vendedor_id || '', 
+                vendedor_nombre: cliente.vendedor_nombre || '',
+                latitud: cliente.latitud || '',
+                longitud: cliente.longitud || '',
+                horario_atencion: cliente.horario_atencion || '',
+                horario_entrega: cliente.horario_entrega || ''
+            }); 
         } else {
-            setFormData({ nombre_comercio: '', nombre_contacto: '', direccion: '', telefono: '', vendedor_id: '', vendedor_nombre: '' });
+            setFormData({ 
+                nombre_comercio: '', nombre_contacto: '', direccion: '', telefono: '', 
+                vendedor_id: '', vendedor_nombre: '', latitud: '', longitud: '', 
+                horario_atencion: '', horario_entrega: '' 
+            });
         }
     }, [cliente, isEditing]);
 
@@ -65,13 +84,23 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-4 border-b"><h2 className="text-xl font-bold text-gray-800">{isEditing ? 'Editar Cliente' : 'Agregar Cliente'}</h2><button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon/></button></div>
                 <div className="p-6 overflow-y-auto space-y-4">
-                    <div><label htmlFor="nombre_comercio" className="block text-sm font-medium text-gray-700">Nombre del Comercio</label><input type="text" name="nombre_comercio" id="nombre_comercio" value={formData.nombre_comercio} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required /></div>
-                    <div><label htmlFor="nombre_contacto" className="block text-sm font-medium text-gray-700">Nombre del Contacto</label><input type="text" name="nombre_contacto" id="nombre_contacto" value={formData.nombre_contacto} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
-                    <div><label htmlFor="direccion" className="block text-sm font-medium text-gray-700">Detalles / Referencias</label><input type="text" name="direccion" id="direccion" value={formData.direccion} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
-                    <div><label htmlFor="telefono" className="block text-sm font-medium text-gray-700">Teléfono</label><input type="text" name="telefono" id="telefono" value={formData.telefono} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
-                    <div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div><label htmlFor="nombre_comercio" className="block text-sm font-medium text-gray-700">Nombre del Comercio</label><input type="text" name="nombre_comercio" id="nombre_comercio" value={formData.nombre_comercio} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required /></div>
+                        <div><label htmlFor="nombre_contacto" className="block text-sm font-medium text-gray-700">Nombre del Contacto</label><input type="text" name="nombre_contacto" id="nombre_contacto" value={formData.nombre_contacto} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                        <div><label htmlFor="direccion" className="block text-sm font-medium text-gray-700">Detalles / Referencias</label><input type="text" name="direccion" id="direccion" value={formData.direccion} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                        <div><label htmlFor="telefono" className="block text-sm font-medium text-gray-700">Teléfono</label><input type="text" name="telefono" id="telefono" value={formData.telefono} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
+                        <div><label htmlFor="latitud" className="block text-sm font-medium text-gray-700">Latitud GPS</label><input type="text" name="latitud" id="latitud" value={formData.latitud} onChange={handleChange} placeholder="Ej: -26.8241" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                        <div><label htmlFor="longitud" className="block text-sm font-medium text-gray-700">Longitud GPS</label><input type="text" name="longitud" id="longitud" value={formData.longitud} onChange={handleChange} placeholder="Ej: -65.2226" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
+                        <div><label htmlFor="horario_atencion" className="block text-sm font-medium text-gray-700">Horario de Atención</label><input type="text" name="horario_atencion" id="horario_atencion" value={formData.horario_atencion} onChange={handleChange} placeholder="JSON de horarios" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                        <div><label htmlFor="horario_entrega" className="block text-sm font-medium text-gray-700">Horario Recepción Pedidos</label><input type="text" name="horario_entrega" id="horario_entrega" value={formData.horario_entrega} onChange={handleChange} placeholder="Si difiere del de atención" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                    </div>
+                    <div className="border-t pt-4">
                         <label htmlFor="vendedor_id" className="block text-sm font-medium text-gray-700">Vendedor Asignado</label>
-                        <select name="vendedor_id" id="vendedor_id" value={formData.vendedor_id} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3">
+                        <select name="vendedor_id" id="vendedor_id" value={formData.vendedor_id} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white">
                             <option value="">-- Seleccionar Vendedor --</option>
                             {vendedores.map(v => <option key={v.id} value={v.id}>{v.nombre}</option>)}
                         </select>
