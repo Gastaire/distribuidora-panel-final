@@ -90,13 +90,27 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
                         <div><label htmlFor="direccion" className="block text-sm font-medium text-gray-700">Detalles / Referencias</label><input type="text" name="direccion" id="direccion" value={formData.direccion} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
                         <div><label htmlFor="telefono" className="block text-sm font-medium text-gray-700">Teléfono</label><input type="text" name="telefono" id="telefono" value={formData.telefono} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
-                        <div><label htmlFor="latitud" className="block text-sm font-medium text-gray-700">Latitud GPS</label><input type="text" name="latitud" id="latitud" value={formData.latitud} onChange={handleChange} placeholder="Ej: -26.8241" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
-                        <div><label htmlFor="longitud" className="block text-sm font-medium text-gray-700">Longitud GPS</label><input type="text" name="longitud" id="longitud" value={formData.longitud} onChange={handleChange} placeholder="Ej: -65.2226" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                    <div className="border-t pt-4">
+                        <p className="block text-sm font-medium text-gray-700 mb-2">Ubicación GPS</p>
+                        <LocationPicker 
+                            lat={formData.latitud} 
+                            lng={formData.longitud} 
+                            onChange={(lat, lng) => setFormData(prev => ({ ...prev, latitud: lat, longitud: lng }))}
+                        />
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
-                        <div><label htmlFor="horario_atencion" className="block text-sm font-medium text-gray-700">Horario de Atención</label><input type="text" name="horario_atencion" id="horario_atencion" value={formData.horario_atencion} onChange={handleChange} placeholder="JSON de horarios" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
-                        <div><label htmlFor="horario_entrega" className="block text-sm font-medium text-gray-700">Horario Recepción Pedidos</label><input type="text" name="horario_entrega" id="horario_entrega" value={formData.horario_entrega} onChange={handleChange} placeholder="Si difiere del de atención" className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
+                    <div className="border-t pt-4 space-y-4">
+                        <HorariosPicker 
+                            label="Horario de Atención" 
+                            hint="Seleccione los días y el rango de horas."
+                            value={formData.horario_atencion}
+                            onChange={(val) => setFormData(prev => ({ ...prev, horario_atencion: val }))}
+                        />
+                        <HorariosPicker 
+                            label="Horario de Recepción de Pedidos" 
+                            hint="Opcional. Solo si difiere del horario de atención."
+                            value={formData.horario_entrega}
+                            onChange={(val) => setFormData(prev => ({ ...prev, horario_entrega: val }))}
+                        />
                     </div>
                     <div className="border-t pt-4">
                         <label htmlFor="vendedor_id" className="block text-sm font-medium text-gray-700">Vendedor Asignado</label>
