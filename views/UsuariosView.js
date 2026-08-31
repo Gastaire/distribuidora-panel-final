@@ -31,12 +31,24 @@ const UsuariosView = ({ onShowUsuarioForm }) => {
 
     const handleDelete = async () => {
         try {
-            await fetch(`${API_URL}/usuarios/${confirmDelete.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/usuarios/${confirmDelete.id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error('Error al desactivar.');
             setConfirmDelete(null);
             fetchUsers();
         } catch (err) {
-            alert("Error al eliminar el usuario.");
+            alert(err.message || "Error al desactivar el usuario.");
             setConfirmDelete(null);
+        }
+    };
+
+    const handleRestore = async (usuarioId) => {
+        if (!window.confirm("¿Seguro que quieres reactivar este usuario?")) return;
+        try {
+            const res = await fetch(`${API_URL}/usuarios/${usuarioId}/restore`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) throw new Error('Error al reactivar.');
+            fetchUsers();
+        } catch (err) {
+            alert(err.message || "Error al reactivar el usuario.");
         }
     };
 
@@ -44,8 +56,8 @@ const UsuariosView = ({ onShowUsuarioForm }) => {
         <div>
             {confirmDelete && (
                 <PasswordConfirmModal
-                    title={`¿Eliminar a ${confirmDelete.nombre}?`}
-                    message="Esta acción es irreversible. Todos los datos asociados a este usuario se perderán."
+                    title={`¿Desactivar a ${confirmDelete.nombre}?`}
+                    message="El usuario no podrá acceder al sistema, pero sus registros de ventas se mantendrán."
                     onConfirm={handleDelete}
                     onClose={() => setConfirmDelete(null)}
                 />
@@ -56,16 +68,27 @@ const UsuariosView = ({ onShowUsuarioForm }) => {
             </div>
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol</th><th className="relative px-6 py-3"></th></tr></thead>
+                    <thead className="bg-gray-50"><tr><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rol</th><th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th><th className="relative px-6 py-3"></th></tr></thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                         {users.map(user => (
                             <tr key={user.id}>
                                 <td className="px-6 py-4 font-medium">{user.nombre}</td>
                                 <td className="px-6 py-4 text-gray-600">{user.email}</td>
                                 <td className="px-6 py-4 text-gray-600 capitalize">{user.rol}</td>
+                                <td className="px-6 py-4">
+                                    {user.activo === false ? (
+                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Inactivo</span>
+                                    ) : (
+                                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 text-right space-x-4">
                                     <button onClick={() => onShowUsuarioForm(user)} className="text-blue-600 hover:text-blue-900">Editar</button>
-                                    <button onClick={() => setConfirmDelete(user)} className="text-red-600 hover:text-red-900">Eliminar</button>
+                                    {user.activo === false ? (
+                                        <button onClick={() => handleRestore(user.id)} className="text-green-600 hover:text-green-900">Activar</button>
+                                    ) : (
+                                        <button onClick={() => setConfirmDelete(user)} className="text-red-600 hover:text-red-900">Desactivar</button>
+                                    )}
                                 </td>
                             </tr>
                         ))}
