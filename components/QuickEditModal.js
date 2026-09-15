@@ -17,13 +17,13 @@ const KEYWORD_CATEGORY_MAP = [
     // Lácteos
     { keys: ['leche', 'yogur', 'yogurt', 'queso', 'manteca', 'crema', 'ricota', 'dulce de leche', 'postre', 'flan', 'danette'], cat: 'Lácteos' },
     // Bebidas
-    { keys: ['gaseosa', 'coca', 'pepsi', 'sprite', 'fanta', 'agua', 'jugo', 'néctar', 'nectar', 'soda', 'tónica', 'tonica', 'cerveza', 'vino', 'fernet', 'whisky', 'gin', 'vodka', 'energy', 'te ', 'té ', 'mate', 'cocido', 'limonada'], cat: 'Bebidas' },
+    { keys: ['gaseosa', 'coca', 'pepsi', 'sprite', 'fanta', 'agua', 'jugo', 'néctar', 'nectar', 'soda', 'tónica', 'tonica', 'cerveza', 'vino', 'fernet', 'whisky', 'gin', 'vodka', 'energy', 'te', 'té', 'mate', 'cocido', 'limonada', 'cafe', 'café'], cat: 'Bebidas' },
     // Panificados y harinas
-    { keys: ['pan ', 'harina', 'biscuit', 'galletita', 'galleta', 'tostada', 'wafle', 'waffle', 'facturia', 'factura', 'medialunas', 'tortita'], cat: 'Panificados y Harinas' },
+    { keys: ['pan', 'harina', 'biscuit', 'galletita', 'galleta', 'tostada', 'wafle', 'waffle', 'facturia', 'factura', 'medialunas', 'tortita'], cat: 'Panificados y Harinas' },
     // Cereales y desayuno
     { keys: ['cereal', 'avena', 'granola', 'muesli', 'copos', 'nesquik', 'cacao en polvo'], cat: 'Cereales y Desayuno' },
     // Aceites y condimentos
-    { keys: ['aceite', 'vinagre', 'ketchup', 'mostaza', 'mayonesa', 'salsa', 'aderezos', 'aderezo', 'pimienta', 'orégano', 'oregano', 'perejil', 'laurel', 'ajo', 'sal ', 'condimento'], cat: 'Aceites y Condimentos' },
+    { keys: ['aceite', 'vinagre', 'ketchup', 'mostaza', 'mayonesa', 'salsa', 'aderezos', 'aderezo', 'pimienta', 'orégano', 'oregano', 'perejil', 'laurel', 'ajo', 'sal', 'condimento'], cat: 'Aceites y Condimentos' },
     // Conservas y enlatados
     { keys: ['lata', 'atún', 'atun', 'sardina', 'caballa', 'tomate en', 'tomate triturado', 'conserva', 'arvejas', 'choclo en', 'palmito', 'durazno en', 'pera en'], cat: 'Conservas' },
     // Fideos y arroz
@@ -61,7 +61,12 @@ const suggestCategory = (nombre, categorias) => {
 
     // 1. Diccionario de keywords
     for (const entry of KEYWORD_CATEGORY_MAP) {
-        if (entry.keys.some(k => n.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) {
+        // usar RegExp para asegurar match de palabra completa (word boundary)
+        if (entry.keys.some(k => {
+            const cleanK = k.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const regex = new RegExp(`\\b${cleanK}\\b`);
+            return regex.test(n);
+        })) {
             // Si hay una categoría real que empieza con el mismo texto, usarla
             if (categorias && categorias.length > 0) {
                 const catMatch = categorias.find(c => {
@@ -189,6 +194,31 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
             alert('Error al procesar la imagen: ' + err.message);
         }
     };
+
+    // ─── Soporte para pegar imagen desde el portapapeles ───────────────────────
+    React.useEffect(() => {
+        const handleGlobalPaste = async (e) => {
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let item of items) {
+                if (item.type.indexOf("image") === 0) {
+                    const file = item.getAsFile();
+                    if (file) {
+                        try {
+                            const compressed = await compressImage(file);
+                            setPreview(compressed);
+                            updateChange('imagen_url', compressed);
+                        } catch (err) {
+                            alert('Error al pegar la imagen: ' + err.message);
+                        }
+                    }
+                    break;
+                }
+            }
+        };
+        window.addEventListener('paste', handleGlobalPaste);
+        return () => window.removeEventListener('paste', handleGlobalPaste);
+    }, [producto?.id]);
+
 
     // ─── Fetch de imagen desde URL ─────────────────────────────────────────────
     const handleFetchUrl = async () => {

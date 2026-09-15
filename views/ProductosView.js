@@ -98,8 +98,10 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                     productos={filteredProductos.filter(p => !p.archivado)}
                     initialIndex={quickEditIndex}
                     categorias={categorias || []}
-                    onClose={() => setQuickEditIndex(null)}
-                    onSaved={() => onRefresh(showArchived)}
+                    onClose={() => {
+                        setQuickEditIndex(null);
+                        onRefresh(showArchived);
+                    }}
                 />
             )}
             {confirmArchive && (
