@@ -3,12 +3,94 @@
  * Se agrega a ProductosView con un botón de acceso rápido en cada fila.
  *
  * Técnicas usadas:
- * - Canvas API para compresión/resize de imagen antes de subir (max 600px, 80% calidad JPEG)
- * - Fetch de URL externa para importar imágenes sin depender del CORS del navegador
- *   (la API actúa como proxy descargando y guardando la imagen)
+ * - Canvas API (nativa del navegador, 100% gratis) para compresión/resize de imagen
+ *   antes de guardar (max 600px, 80% calidad JPEG)
+ * - Fetch de URL externa con fallback a URL directa si hay CORS
  * - Navegación tipo Tinder: botones prev/next o teclado ←/→
+ * - Sugerencia de categoría por afinidad de keywords (sin API externa, sin costo)
  */
 
+// ─── Diccionario de keywords → categoría sugerida ─────────────────────────────
+// Clave: substring en el nombre del producto (lowercase, sin acentos)
+// Valor: nombre de categoría sugerida (debe coincidir con categorías reales si existen)
+const KEYWORD_CATEGORY_MAP = [
+    // Lácteos
+    { keys: ['leche', 'yogur', 'yogurt', 'queso', 'manteca', 'crema', 'ricota', 'dulce de leche', 'postre', 'flan', 'danette'], cat: 'Lácteos' },
+    // Bebidas
+    { keys: ['gaseosa', 'coca', 'pepsi', 'sprite', 'fanta', 'agua', 'jugo', 'néctar', 'nectar', 'soda', 'tónica', 'tonica', 'cerveza', 'vino', 'fernet', 'whisky', 'gin', 'vodka', 'energy', 'te ', 'té ', 'mate', 'cocido', 'limonada'], cat: 'Bebidas' },
+    // Panificados y harinas
+    { keys: ['pan ', 'harina', 'biscuit', 'galletita', 'galleta', 'tostada', 'wafle', 'waffle', 'facturia', 'factura', 'medialunas', 'tortita'], cat: 'Panificados y Harinas' },
+    // Cereales y desayuno
+    { keys: ['cereal', 'avena', 'granola', 'muesli', 'copos', 'nesquik', 'cacao en polvo'], cat: 'Cereales y Desayuno' },
+    // Aceites y condimentos
+    { keys: ['aceite', 'vinagre', 'ketchup', 'mostaza', 'mayonesa', 'salsa', 'aderezos', 'aderezo', 'pimienta', 'orégano', 'oregano', 'perejil', 'laurel', 'ajo', 'sal ', 'condimento'], cat: 'Aceites y Condimentos' },
+    // Conservas y enlatados
+    { keys: ['lata', 'atún', 'atun', 'sardina', 'caballa', 'tomate en', 'tomate triturado', 'conserva', 'arvejas', 'choclo en', 'palmito', 'durazno en', 'pera en'], cat: 'Conservas' },
+    // Fideos y arroz
+    { keys: ['fideo', 'pasta', 'spaghetti', 'espagueti', 'ravioles', 'tallarín', 'tallarin', 'ñoquis', 'arroz', 'polenta', 'semola', 'sémola'], cat: 'Pastas y Arroz' },
+    // Carnes y fiambres
+    { keys: ['jamón', 'jamon', 'salame', 'salami', 'mortadela', 'fiambre', 'chorizo', 'longaniza', 'paleta', 'panceta', 'tocino', 'pollo', 'carne', 'vacuno'], cat: 'Carnes y Fiambres' },
+    // Dulces y golosinas
+    { keys: ['chocolate', 'alfajor', 'caramelo', 'gomita', 'chicle', 'dulce', 'mermelada', 'miel', 'azucar', 'azúcar', 'coco rallado', 'turron', 'turrón', 'nougat', 'wafer'], cat: 'Dulces y Golosinas' },
+    // Limpieza
+    { keys: ['jabón', 'jabon', 'detergente', 'limpiapisos', 'desengrasante', 'lavandina', 'cloro', 'suavizante', 'desodorante', 'olor', 'limpiador', 'desinfectante', 'lustramuebles', 'trapo', 'esponja', 'virulana'], cat: 'Limpieza' },
+    // Higiene personal
+    { keys: ['shampoo', 'champú', 'acondicionador', 'crema de enjuague', 'gel ', 'desodorante personal', 'pasta dental', 'cepillo', 'algodón', 'algodon', 'hisopo', 'pañal', 'panal', 'toallita', 'preservativo', 'anticonceptivo'], cat: 'Higiene Personal' },
+    // Papel
+    { keys: ['papel ', 'servilleta', 'rollo', 'toalla de papel', 'tissue', 'pañuelo descartable', 'cuaderno', 'bolsa de basura', 'film', 'papel aluminio', 'papel film'], cat: 'Papel y Descartables' },
+    // Frutas y verduras
+    { keys: ['fruta', 'manzana', 'banana', 'naranja', 'limón', 'limon', 'pera ', 'uva', 'verdura', 'papa', 'tomate', 'cebolla', 'zanahoria', 'zapallo', 'lechuga'], cat: 'Frutas y Verduras' },
+    // Snacks
+    { keys: ['papas fritas', 'chips', 'palitos', 'maní', 'mani', 'pochoclo', 'crackers', 'snack'], cat: 'Snacks' },
+];
+
+/**
+ * Sugiere una categoría basándose en el nombre del producto.
+ * Primero intenta matchear contra keywords del diccionario,
+ * luego contra los nombres de las categorías existentes por similitud.
+ *
+ * @param {string} nombre - Nombre del producto
+ * @param {Array}  categorias - Lista de categorías {id, nombre} del sistema
+ * @returns {string|null} - Nombre de categoría sugerida, o null si no hay match
+ */
+const suggestCategory = (nombre, categorias) => {
+    if (!nombre) return null;
+    const n = nombre.toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar acentos
+        .replace(/[^a-z0-9 ]/g, ' ');
+
+    // 1. Diccionario de keywords
+    for (const entry of KEYWORD_CATEGORY_MAP) {
+        if (entry.keys.some(k => n.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) {
+            // Si hay una categoría real que empieza con el mismo texto, usarla
+            if (categorias && categorias.length > 0) {
+                const catMatch = categorias.find(c =>
+                    c.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
+                        entry.cat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(' ')[0]
+                    )
+                );
+                if (catMatch) return catMatch.nombre;
+            }
+            return entry.cat; // devolver la sugerida del diccionario
+        }
+    }
+
+    // 2. Matcheo directo contra nombres de categorías existentes
+    if (categorias && categorias.length > 0) {
+        for (const cat of categorias) {
+            const catNorm = cat.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            // Si alguna palabra de la categoría aparece en el nombre del producto
+            const palabrasCat = catNorm.split(/[\s&,/]+/).filter(p => p.length >= 4);
+            if (palabrasCat.some(p => n.includes(p))) {
+                return cat.nombre;
+            }
+        }
+    }
+
+    return null;
+};
+
+// ─── Componente Principal ──────────────────────────────────────────────────────
 const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved }) => {
     const [currentIndex, setCurrentIndex] = React.useState(initialIndex || 0);
     const [saving, setSaving] = React.useState(false);
@@ -23,9 +105,15 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
     const changes = pendingChanges[producto?.id] || {};
     
     // Estado actual (aplicando cambios pendientes si los hay)
-    const currentImagen  = changes.imagen_url  !== undefined ? changes.imagen_url  : producto?.imagen_url  || '';
-    const currentStock   = changes.stock        !== undefined ? changes.stock       : producto?.stock       || 'No';
-    const currentCategoria = changes.categoria  !== undefined ? changes.categoria   : producto?.categoria   || '';
+    const currentImagen    = changes.imagen_url  !== undefined ? changes.imagen_url  : producto?.imagen_url  || '';
+    const currentStock     = changes.stock        !== undefined ? changes.stock       : producto?.stock       || 'No';
+    const currentCategoria = changes.categoria    !== undefined ? changes.categoria   : producto?.categoria   || '';
+
+    // Sugerencia de categoría (solo si no tiene categoría asignada)
+    const suggestedCat = React.useMemo(() => {
+        if (currentCategoria) return null; // ya tiene una, no sugerir
+        return suggestCategory(producto?.nombre, categorias);
+    }, [producto?.id, currentCategoria, categorias]);
 
     // Reset al cambiar de producto
     React.useEffect(() => {
@@ -60,7 +148,7 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
         }));
     };
 
-    // ─── Compresión de imagen con Canvas ───────────────────────────────────────
+    // ─── Compresión de imagen con Canvas API (gratis, nativa del navegador) ────
     const compressImage = (file) => new Promise((resolve, reject) => {
         const MAX_DIM = 600;
         const reader = new FileReader();
@@ -74,10 +162,8 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                 }
                 const canvas = document.createElement('canvas');
                 canvas.width = width; canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
-                resolve(dataUrl);
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.80));
             };
             img.onerror = reject;
             img.src = ev.target.result;
@@ -103,7 +189,6 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
         if (!imageUrl.trim()) return;
         setFetchingUrl(true);
         try {
-            // Intentar cargar en canvas (puede fallar por CORS, pero intentamos)
             const img = new Image();
             img.crossOrigin = 'anonymous';
             const loaded = await new Promise((resolve) => {
@@ -126,10 +211,9 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                 setPreview(dataUrl);
                 updateChange('imagen_url', dataUrl);
             } else {
-                // No se pudo comprimir (CORS), guardamos la URL directamente
+                // CORS bloqueó → guardar URL directa
                 setPreview(imageUrl.trim());
                 updateChange('imagen_url', imageUrl.trim());
-                console.info('QuickEdit: CORS bloqueó compresión, guardando URL directa.');
             }
         } catch (err) {
             alert('Error al cargar la imagen: ' + err.message);
@@ -157,7 +241,6 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                 const err = await res.json();
                 throw new Error(err.message || 'Error al guardar');
             }
-            // Quitar de pendientes
             setPendingChanges(prev => {
                 const next = { ...prev };
                 delete next[producto.id];
@@ -204,7 +287,7 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                 </div>
 
                 {/* Imagen actual */}
-                <div className="relative bg-gray-100 flex items-center justify-center overflow-hidden" style={{ height: 180 }}>
+                <div className="relative bg-gray-100 flex items-center justify-center overflow-hidden" style={{ height: 170 }}>
                     <img
                         src={imgSrc}
                         alt={producto.nombre}
@@ -222,7 +305,6 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                     {/* — IMAGEN — */}
                     <div>
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Imagen</p>
-                        {/* Tabs */}
                         <div className="flex gap-1 bg-gray-100 rounded-lg p-1 mb-3">
                             <button onClick={() => setImageTab('url')}    className={`flex-1 text-xs py-1.5 rounded-md font-semibold transition-colors ${imageTab === 'url'    ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}>🔗 Por URL</button>
                             <button onClick={() => setImageTab('upload')} className={`flex-1 text-xs py-1.5 rounded-md font-semibold transition-colors ${imageTab === 'upload' ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}>📁 Subir</button>
@@ -236,6 +318,7 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                                     value={imageUrl}
                                     onChange={e => setImageUrl(e.target.value)}
                                     className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                    onKeyDown={e => e.key === 'Enter' && handleFetchUrl()}
                                 />
                                 <button
                                     onClick={handleFetchUrl}
@@ -254,7 +337,7 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     <span>Elegir archivo</span>
-                                    <span className="text-xs text-gray-400">Se optimiza automáticamente (max 600px)</span>
+                                    <span className="text-xs text-gray-400">Se optimiza automáticamente (max 600px, JPEG 80%)</span>
                                 </button>
                             </div>
                         )}
@@ -282,7 +365,19 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
 
                     {/* — CATEGORÍA — */}
                     <div>
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Categoría</p>
+                        <div className="flex items-center justify-between mb-2">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide">Categoría</p>
+                            {/* Sugerencia automática */}
+                            {suggestedCat && (
+                                <button
+                                    onClick={() => updateChange('categoria', suggestedCat)}
+                                    className="text-xs bg-amber-50 border border-amber-300 text-amber-700 px-2 py-0.5 rounded-full font-semibold hover:bg-amber-100 transition-colors flex items-center gap-1"
+                                    title="Sugerencia basada en el nombre del producto"
+                                >
+                                    ✨ {suggestedCat}
+                                </button>
+                            )}
+                        </div>
                         <select
                             value={currentCategoria}
                             onChange={e => updateChange('categoria', e.target.value)}
@@ -293,6 +388,11 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                                 <option key={cat.id || cat.nombre} value={cat.nombre}>{cat.nombre}</option>
                             ))}
                         </select>
+                        {suggestedCat && !currentCategoria && (
+                            <p className="text-xs text-amber-600 mt-1.5">
+                                ✨ Sugerida por nombre — apretá el botón para aplicar
+                            </p>
+                        )}
                     </div>
                 </div>
 
