@@ -65,6 +65,7 @@ const suggestCategory = (nombre, categorias) => {
             // Si hay una categoría real que empieza con el mismo texto, usarla
             if (categorias && categorias.length > 0) {
                 const catMatch = categorias.find(c =>
+                    c && c.nombre &&
                     c.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
                         entry.cat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(' ')[0]
                     )
@@ -78,8 +79,8 @@ const suggestCategory = (nombre, categorias) => {
     // 2. Matcheo directo contra nombres de categorías existentes
     if (categorias && categorias.length > 0) {
         for (const cat of categorias) {
+            if (!cat || !cat.nombre) continue; // guard: saltear categorías sin nombre
             const catNorm = cat.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            // Si alguna palabra de la categoría aparece en el nombre del producto
             const palabrasCat = catNorm.split(/[\s&,/]+/).filter(p => p.length >= 4);
             if (palabrasCat.some(p => n.includes(p))) {
                 return cat.nombre;
@@ -384,8 +385,8 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                             className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                         >
                             <option value="">Sin categoría</option>
-                            {(categorias || []).map(cat => (
-                                <option key={cat.id || cat.nombre} value={cat.nombre}>{cat.nombre}</option>
+                            {(categorias || []).map((cat, i) => (
+                                <option key={cat?.id ?? cat?.nombre ?? i} value={cat?.nombre || ''}>{cat?.nombre || '(sin nombre)'}</option>
                             ))}
                         </select>
                         {suggestedCat && !currentCategoria && (
