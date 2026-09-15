@@ -64,26 +64,28 @@ const suggestCategory = (nombre, categorias) => {
         if (entry.keys.some(k => n.includes(k.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) {
             // Si hay una categoría real que empieza con el mismo texto, usarla
             if (categorias && categorias.length > 0) {
-                const catMatch = categorias.find(c =>
-                    c && c.nombre &&
-                    c.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
+                const catMatch = categorias.find(c => {
+                    // categorias puede ser array de strings o array de {nombre}
+                    const catNombre = typeof c === 'string' ? c : (c?.nombre || '');
+                    return catNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(
                         entry.cat.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(' ')[0]
-                    )
-                );
-                if (catMatch) return catMatch.nombre;
+                    );
+                });
+                if (catMatch) return typeof catMatch === 'string' ? catMatch : catMatch.nombre;
             }
-            return entry.cat; // devolver la sugerida del diccionario
+            return entry.cat;
         }
     }
 
     // 2. Matcheo directo contra nombres de categorías existentes
     if (categorias && categorias.length > 0) {
         for (const cat of categorias) {
-            if (!cat || !cat.nombre) continue; // guard: saltear categorías sin nombre
-            const catNorm = cat.nombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            const catNombre = typeof cat === 'string' ? cat : (cat?.nombre || '');
+            if (!catNombre) continue;
+            const catNorm = catNombre.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
             const palabrasCat = catNorm.split(/[\s&,/]+/).filter(p => p.length >= 4);
             if (palabrasCat.some(p => n.includes(p))) {
-                return cat.nombre;
+                return catNombre;
             }
         }
     }
@@ -108,11 +110,14 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
     // Estado actual (aplicando cambios pendientes si los hay)
     const currentImagen    = changes.imagen_url  !== undefined ? changes.imagen_url  : producto?.imagen_url  || '';
     const currentStock     = changes.stock        !== undefined ? changes.stock       : producto?.stock       || 'No';
-    const currentCategoria = changes.categoria    !== undefined ? changes.categoria   : producto?.categoria   || '';
+    const currentCategoria = changes.categoria !== undefined ? changes.categoria : producto?.categoria || '';
+
+    // Helper para obtener el nombre de una categoría (soporte string y objeto)
+    const getCatNombre = (cat) => typeof cat === 'string' ? cat : (cat?.nombre || '');
 
     // Sugerencia de categoría (solo si no tiene categoría asignada)
     const suggestedCat = React.useMemo(() => {
-        if (currentCategoria) return null; // ya tiene una, no sugerir
+        if (currentCategoria) return null;
         return suggestCategory(producto?.nombre, categorias);
     }, [producto?.id, currentCategoria, categorias]);
 
@@ -385,9 +390,12 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                             className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                         >
                             <option value="">Sin categoría</option>
-                            {(categorias || []).map((cat, i) => (
-                                <option key={cat?.id ?? cat?.nombre ?? i} value={cat?.nombre || ''}>{cat?.nombre || '(sin nombre)'}</option>
-                            ))}
+                            {(categorias || []).map((cat, i) => {
+                                const nombre = getCatNombre(cat);
+                                return (
+                                    <option key={nombre || i} value={nombre}>{nombre || '(sin nombre)'}</option>
+                                );
+                            })}
                         </select>
                         {suggestedCat && !currentCategoria && (
                             <p className="text-xs text-amber-600 mt-1.5">
