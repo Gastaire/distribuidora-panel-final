@@ -30,6 +30,8 @@ const ProductoFormModal = ({ producto, onClose, onSuccess, allCategories }) => {
     const [error, setError] = React.useState(null);
     const token = localStorage.getItem('token');
     const isEditing = producto && producto.id;
+    const isMounted = React.useRef(true);
+    React.useEffect(() => () => { isMounted.current = false; }, []);
 
     React.useEffect(() => { 
         if (isEditing) { 
@@ -91,7 +93,7 @@ const ProductoFormModal = ({ producto, onClose, onSuccess, allCategories }) => {
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Error al guardar el producto.');
             onSuccess();
-        } catch (err) { setError(err.message); } finally { setLoading(false); }
+        } catch (err) { if (isMounted.current) setError(err.message); } finally { if (isMounted.current) setLoading(false); }
     };
      return (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">

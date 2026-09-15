@@ -113,9 +113,10 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
     const changes = pendingChanges[producto?.id] || {};
     
     // Estado actual (aplicando cambios pendientes si los hay)
-    const currentImagen    = changes.imagen_url  !== undefined ? changes.imagen_url  : producto?.imagen_url  || '';
-    const currentStock     = changes.stock        !== undefined ? changes.stock       : producto?.stock       || 'No';
-    const currentCategoria = changes.categoria !== undefined ? changes.categoria : producto?.categoria || '';
+    // Nota: usa ?? para manejar null Y undefined — value={null} en un input causa warning de React
+    const currentImagen    = (changes.imagen_url  != null ? changes.imagen_url  : producto?.imagen_url)  ?? '';
+    const currentStock     = (changes.stock        != null ? changes.stock       : producto?.stock)       ?? 'No';
+    const currentCategoria = (changes.categoria    != null ? changes.categoria   : producto?.categoria)   ?? '';
 
     // Helper para obtener el nombre de una categoría (soporte string y objeto)
     const getCatNombre = (cat) => typeof cat === 'string' ? cat : (cat?.nombre || '');
@@ -198,20 +199,21 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
     // ─── Soporte para pegar imagen desde el portapapeles ───────────────────────
     React.useEffect(() => {
         const handleGlobalPaste = async (e) => {
-            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (let item of items) {
-                if (item.type.indexOf("image") === 0) {
-                    const file = item.getAsFile();
-                    if (file) {
-                        try {
-                            const compressed = await compressImage(file);
-                            setPreview(compressed);
-                            updateChange('imagen_url', compressed);
-                        } catch (err) {
-                            alert('Error al pegar la imagen: ' + err.message);
-                        }
+            // Soporte para eventos DOM nativos y jQuery
+            const clipboard = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+            if (!clipboard) return;
+            const items = Array.from(clipboard.items || []);
+            const imageItem = items.find(item => item.type.startsWith('image'));
+            if (imageItem) {
+                const file = imageItem.getAsFile();
+                if (file) {
+                    try {
+                        const compressed = await compressImage(file);
+                        setPreview(compressed);
+                        updateChange('imagen_url', compressed);
+                    } catch (err) {
+                        alert('Error al pegar la imagen: ' + err.message);
                     }
-                    break;
                 }
             }
         };
@@ -247,9 +249,10 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
                 setPreview(dataUrl);
                 updateChange('imagen_url', dataUrl);
             } else {
-                // CORS bloqueó → guardar URL directa
+                // CORS blockó → guardar URL directa (el browser la mostrará normalmente desde <img>)
                 setPreview(imageUrl.trim());
                 updateChange('imagen_url', imageUrl.trim());
+                alert('⚠️ La imagen no se pudo descargar por restricciones del servidor externo (CORS), pero la URL fue guardada igual. Se verá correctamente en la lista de productos.');
             }
         } catch (err) {
             alert('Error al cargar la imagen: ' + err.message);
