@@ -852,6 +852,7 @@
                                     error={errorProductos}
                                     onRefresh={fetchProductos}
                                     onShowPdfOptionsModal={onShowPdfOptionsModal}
+                                    categorias={categorias}
                                 />;
                     case 'categorias':
                         return <CategoriasView
@@ -1130,285 +1131,178 @@
                 ];
                 
                 if (options.format === 'catalog') {
-                    // FORMATO CATÁLOGO (CUADRÍCULA) - AHORA EN VERTICAL CON MANEJO MEJORADO DE IMÁGENES
-                    // Parámetros para la cuadrícula de 4x5
-                    const cols = 4; // 4 columnas
-                    const itemWidth = (contentWidth - ((cols-1) * 2)) / cols; // Ancho de cada celda con pequeño gap
-                    const imgSize = itemWidth - 4; // Tamaño de la imagen ajustado para dejar margen
-                    const itemHeight = imgSize + 20; // Alto para imagen + texto y precio
-                    
-                    // Crear una imagen de marcador de posición
-                    const placeholderImgData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBNYWNpbnRvc2giIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OENDRjNBN0E2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OENDRjNBN0I2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4Q0NGM0E3ODY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4Q0NGM0E3OTY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PqqezsUAAAAfSURBVHjaYmRgYJD6//8/AwMDEwMDAwMDEAMDAAMBAQB+EXF/AAAAABJRU5ErkJggg==';
-                    
-                    let colorIndex = 0; // Para alternar colores entre categorías
-                    
+                    // FORMATO CATÁLOGO (CUADRÍCULA) - 4 columnas, control de página por fila completa
+                    const cols = 4;
+                    const gap = 2; // mm entre celdas
+                    const itemWidth = (contentWidth - (gap * (cols - 1))) / cols;
+                    const imgSize = itemWidth - 4;
+                    const nameBoxH = 11;
+                    const priceBoxH = 9;
+                    const itemHeight = imgSize + nameBoxH + priceBoxH + 4; // total altura celda
+
+                    const placeholderImgData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBNYWNpbnRvc2giIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OENDRjNBN0E2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OENDRjNBN0I2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4Q0NGM0E3ODY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4Q0NGM0E3OTY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0 eng0ZD0iciI/PqqezsUAAAAfSURBVHjaYmRgYJD6//8/AwMDEwMDAwMDEAMDAAMBAQB+EXF/AAAAABJRU5ErkJggg==';
+
+                    let colorIndex = 0;
+
                     for (const category of sortedCategories) {
                         const productsInCategory = groupedProducts[category];
-                        
-                        // Si la categoría no tiene productos después del filtrado, la saltamos
-                        if (!productsInCategory || productsInCategory.length === 0) {
-                            continue;
-                        }
-            
-                        // Agregar una página nueva si no hay suficiente espacio
-                        if (yPosition > pageHeight - 40) {
+                        if (!productsInCategory || productsInCategory.length === 0) continue;
+
+                        // Espacio mínimo: header (14mm) + 1 fila completa
+                        if (yPosition > pageHeight - (14 + itemHeight + 10)) {
                             doc.addPage();
                             yPosition = 15;
                         }
-            
-                        // TÍTULO DE CATEGORÍA MEJORADO
+
+                        // Encabezado de categoría
                         const categoryColor = categoryColors[colorIndex % categoryColors.length];
                         colorIndex++;
-                        
-                        // Fondo de título con degradado
                         doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
                         doc.roundedRect(margin, yPosition, contentWidth, 10, 2, 2, 'F');
-                        
-                        // Texto del título
                         doc.setFont(undefined, 'bold');
                         doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(14);
+                        doc.setFontSize(13);
                         doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
-                        
                         yPosition += 14;
-            
-                        // Dibujar productos en formato cuadrícula
+
+                        // Recorrer productos fila por fila
                         let colIndex = 0;
-                        let rowStartY = yPosition;
-                        
+                        let rowY = yPosition;
+
                         for (let i = 0; i < productsInCategory.length; i++) {
                             const product = productsInCategory[i];
-                            
-                            // Calcular posición X,Y para la celda actual
-                            const x = margin + (colIndex * (itemWidth + 1));
-                            let y = rowStartY;
-                            
-                            // Verificar si necesitamos una nueva página
-                            if (y + itemHeight > pageHeight - 10) {
+
+                            // Al inicio de una nueva fila: verificar si cabe en la página
+                            if (colIndex === 0 && rowY + itemHeight > pageHeight - 10) {
                                 doc.addPage();
-                                y = 15; // Asignamos a la variable local 'y', no modificamos rowStartY aquí
-                                rowStartY = 15; // Ahora actualizamos rowStartY para las siguientes celdas
-                                colIndex = 0;
+                                rowY = 15;
                             }
-                            
-                            // Dibujar fondo de celda con borde suave
-                            doc.setFillColor(248, 248, 248);
+
+                            const x = margin + colIndex * (itemWidth + gap);
+                            const y = rowY;
+
+                            // Celda de fondo
+                            doc.setFillColor(248, 249, 250);
                             doc.setDrawColor(220, 220, 220);
-                            doc.roundedRect(x, y, itemWidth, itemHeight, 1, 1, 'FD');
-                            
-                            // Agregar imagen (centrada)
+                            doc.setLineWidth(0.2);
+                            doc.roundedRect(x, y, itemWidth, itemHeight, 1.5, 1.5, 'FD');
+
+                            // Marco imagen
                             const imgX = x + (itemWidth - imgSize) / 2;
                             const imgY = y + 2;
-                            
-                            // Marco para la imagen
-                            doc.setDrawColor(200, 200, 200);
                             doc.setFillColor(255, 255, 255);
-                            doc.roundedRect(imgX, imgY, imgSize, imgSize, 1, 1, 'FD');
-                            
-                            // MANEJO SEGURO DE IMÁGENES - Usar imagen placeholder por defecto
+                            doc.roundedRect(imgX, imgY, imgSize, imgSize, 1, 1, 'F');
+
+                            // Imagen
                             try {
-                                // Si el producto tiene una URL de imagen, intenta agregarla
-                                if (product.imagen_url) {
-                                    // Verificamos si la URL es CORS-friendly (mismo origen o data URL)
-                                    if (product.imagen_url.startsWith('data:') || 
-                                        product.imagen_url.startsWith(window.location.origin)) {
-                                        doc.addImage(
-                                            product.imagen_url,
-                                            'JPEG',
-                                            imgX,
-                                            imgY,
-                                            imgSize,
-                                            imgSize,
-                                            '',
-                                            'FAST'
-                                        );
-                                    } else {
-                                        // Si no es CORS-friendly, usamos la imagen de marcador de posición
-                                        doc.addImage(
-                                            placeholderImgData,
-                                            'PNG',
-                                            imgX,
-                                            imgY,
-                                            imgSize,
-                                            imgSize,
-                                            '',
-                                            'FAST'
-                                        );
-                                        
-                                        // Dibujar texto de producto en el centro de la imagen
-                                        doc.setFontSize(8);
-                                        doc.setTextColor(100, 100, 100);
-                                        doc.text(product.nombre.substring(0, 10) + '...', 
-                                            imgX + imgSize/2, 
-                                            imgY + imgSize/2, 
-                                            {align: 'center', baseline: 'middle'});
-                                    }
+                                if (product.imagen_url && (product.imagen_url.startsWith('data:') || product.imagen_url.startsWith(window.location.origin))) {
+                                    doc.addImage(product.imagen_url, 'JPEG', imgX, imgY, imgSize, imgSize, '', 'FAST');
                                 } else {
-                                    // Si no hay URL de imagen, también usamos el marcador de posición
-                                    doc.addImage(
-                                        placeholderImgData,
-                                        'PNG',
-                                        imgX,
-                                        imgY,
-                                        imgSize,
-                                        imgSize,
-                                        '',
-                                        'FAST'
-                                    );
-                                    
-                                    // Dibujar texto de producto en el centro de la imagen
-                                    doc.setFontSize(8);
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text('Sin imagen', 
-                                        imgX + imgSize/2, 
-                                        imgY + imgSize/2, 
-                                        {align: 'center', baseline: 'middle'});
+                                    doc.addImage(placeholderImgData, 'PNG', imgX, imgY, imgSize, imgSize, '', 'FAST');
                                 }
-                            } catch (e) {
-                                console.log(`No se pudo cargar la imagen para: ${product.nombre}`, e);
-                                // En caso de error, también usamos el marcador de posición
-                                try {
-                                    doc.addImage(
-                                        placeholderImgData,
-                                        'PNG',
-                                        imgX,
-                                        imgY,
-                                        imgSize,
-                                        imgSize,
-                                        '',
-                                        'FAST'
-                                    );
-                                } catch (e2) {
-                                    // Si incluso esto falla, simplemente continuamos sin imagen
-                                    console.error("Error crítico al manejar imágenes:", e2);
-                                }
+                            } catch (_) {
+                                try { doc.addImage(placeholderImgData, 'PNG', imgX, imgY, imgSize, imgSize, '', 'FAST'); } catch (__) {}
                             }
-                            
-                            // Fondo para el nombre (mejora legibilidad)
-                            const nameBoxHeight = 12;
-                            doc.setFillColor(240, 240, 240);
-                            doc.roundedRect(x + 1, y + imgSize + 2, itemWidth - 2, nameBoxHeight, 1, 1, 'F');
-                            
-                            // Nombre del producto (centrado)
+
+                            // Nombre (fondo gris claro)
+                            const nameY = y + imgSize + 2;
+                            doc.setFillColor(238, 240, 243);
+                            doc.roundedRect(x + 1, nameY, itemWidth - 2, nameBoxH, 1, 1, 'F');
                             doc.setFont(undefined, 'bold');
-                            doc.setTextColor(60, 60, 60);
-                            doc.setFontSize(7);
-                            
-                            // Truncar nombre si es muy largo
-                            let nombre = product.nombre;
-                            if (nombre.length > 25) {
-                                nombre = nombre.substring(0, 22) + '...';
-                            }
-                            
-                            // Texto con fondo blanco para mejor legibilidad
-                            doc.text(nombre, x + itemWidth/2, y + imgSize + 8, { 
-                                align: 'center',
-                                maxWidth: itemWidth - 4
-                            });
-                            
-                            // Precio (centrado y más grande)
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(22, 160, 133);
-                            doc.setFontSize(12);
-                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', {maximumFractionDigits: 0})}`;
-                            doc.text(precio, x + itemWidth/2, y + imgSize + 19, { align: 'center' });
-                            
-                            // Avanzar a la siguiente columna o fila
-                            colIndex++;
-                            if (colIndex >= cols) {
-                                colIndex = 0;
-                                rowStartY += itemHeight + 3; // 3mm de espacio entre filas
-                            }
-                        }
-                        
-                        // Actualizar yPosition para la siguiente categoría
-                        yPosition = rowStartY + 10;
-                    }
-                } else {
-                    // FORMATO LISTA DE PRECIOS (sin cambios)
-                    let colorIndex = 0;
-                    
-                    for (const category of sortedCategories) {
-                        const productsInCategory = groupedProducts[category];
-                        
-                        if (!productsInCategory || productsInCategory.length === 0) {
-                            continue;
-                        }
-            
-                        if (yPosition > pageHeight - 30) {
-                            doc.addPage();
-                            yPosition = 15;
-                        }
-            
-                        const categoryColor = categoryColors[colorIndex % categoryColors.length];
-                        colorIndex++;
-                        
-                        doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
-                        doc.roundedRect(margin, yPosition, contentWidth, 10, 3, 3, 'F');
-                        
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(14);
-                        doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
-                        
-                        yPosition += 14;
-            
-                        doc.setDrawColor(200, 200, 200);
-                        doc.setLineWidth(0.3);
-                        doc.line(margin, yPosition - 2, margin + contentWidth, yPosition - 2);
-            
-                        for (const product of productsInCategory) {
-                            if (yPosition > pageHeight - 16) {
-                                doc.addPage();
-                                yPosition = 15;
-                            }
-            
-                            const isEven = productsInCategory.indexOf(product) % 2 === 0;
-                            doc.setFillColor(isEven ? 252 : 248, isEven ? 252 : 248, isEven ? 252 : 248);
-                            doc.roundedRect(margin, yPosition, contentWidth, 15, 1, 1, 'F');
-                            
-                            const imageSize = 12;
-                            doc.setDrawColor(200, 200, 200);
-                            doc.setLineWidth(0.1);
-                            doc.roundedRect(margin + 2, yPosition + 1.5, imageSize, imageSize, 1, 1, 'F');
-                            
-                            if (product.imagen_url) {
-                                try {
-                                    // Solo intentamos cargar la imagen si es del mismo origen o data URL
-                                    if (product.imagen_url.startsWith('data:') || 
-                                        product.imagen_url.startsWith(window.location.origin)) {
-                                        doc.addImage(
-                                            product.imagen_url, 
-                                            'JPEG', 
-                                            margin + 2, 
-                                            yPosition + 1.5, 
-                                            imageSize, 
-                                            imageSize, 
-                                            '', 
-                                            'FAST'
-                                        );
-                                    }
-                                } catch (e) {
-                                    console.log(`No se pudo cargar la imagen para: ${product.nombre}`);
-                                }
-                            }
-                            
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(60, 60, 60);
-                            doc.setFontSize(9);
-                            
-                            const nombreY = yPosition + 7.5;
-                            doc.text(product.nombre, margin + imageSize + 5, nombreY);
-                            
+                            doc.setTextColor(50, 50, 50);
+                            doc.setFontSize(6.5);
+                            const nombre = product.nombre.length > 26 ? product.nombre.substring(0, 23) + '...' : product.nombre;
+                            doc.text(nombre, x + itemWidth / 2, nameY + nameBoxH / 2, { align: 'center', baseline: 'middle', maxWidth: itemWidth - 4 });
+
+                            // Precio
+                            const priceY = nameY + nameBoxH;
                             doc.setFont(undefined, 'bold');
                             doc.setTextColor(22, 160, 133);
                             doc.setFontSize(11);
-                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', {maximumFractionDigits: 0})}`;
-                            doc.text(precio, pageWidth - margin - 3, nombreY, { align: 'right' });
-                            
-                            yPosition += 16;
+                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+                            doc.text(precio, x + itemWidth / 2, priceY + priceBoxH / 2, { align: 'center', baseline: 'middle' });
+
+                            colIndex++;
+                            if (colIndex >= cols) {
+                                colIndex = 0;
+                                rowY += itemHeight + 3;
+                            }
                         }
-                        
+
+                        // Completar la última fila incompleta
+                        if (colIndex > 0) rowY += itemHeight + 3;
+                        yPosition = rowY + 5;
+                    }
+                } else {
+                    // FORMATO LISTA DE PRECIOS
+                    let colorIndex = 0;
+                    const rowH = 15; // altura de cada fila de producto
+
+                    for (const category of sortedCategories) {
+                        const productsInCategory = groupedProducts[category];
+                        if (!productsInCategory || productsInCategory.length === 0) continue;
+
+                        // Espacio mínimo: encabezado + 1 fila
+                        if (yPosition > pageHeight - (14 + rowH + 5)) {
+                            doc.addPage();
+                            yPosition = 15;
+                        }
+
+                        const categoryColor = categoryColors[colorIndex % categoryColors.length];
+                        colorIndex++;
+                        doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
+                        doc.roundedRect(margin, yPosition, contentWidth, 10, 3, 3, 'F');
+                        doc.setFont(undefined, 'bold');
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFontSize(13);
+                        doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
+                        yPosition += 14;
+
+                        doc.setDrawColor(200, 200, 200);
+                        doc.setLineWidth(0.3);
+                        doc.line(margin, yPosition - 2, margin + contentWidth, yPosition - 2);
+
+                        for (let i = 0; i < productsInCategory.length; i++) {
+                            const product = productsInCategory[i];
+
+                            // Verificar espacio antes de cada fila
+                            if (yPosition + rowH > pageHeight - 10) {
+                                doc.addPage();
+                                yPosition = 15;
+                            }
+
+                            const isEven = i % 2 === 0;
+                            doc.setFillColor(isEven ? 252 : 246, isEven ? 252 : 246, isEven ? 252 : 252);
+                            doc.roundedRect(margin, yPosition, contentWidth, rowH - 1, 1, 1, 'F');
+
+                            // Imagen miniatura
+                            const imgSizeList = 11;
+                            doc.setDrawColor(210, 210, 210);
+                            doc.setLineWidth(0.1);
+                            doc.roundedRect(margin + 2, yPosition + 2, imgSizeList, imgSizeList, 1, 1, 'F');
+                            if (product.imagen_url) {
+                                try {
+                                    if (product.imagen_url.startsWith('data:') || product.imagen_url.startsWith(window.location.origin)) {
+                                        doc.addImage(product.imagen_url, 'JPEG', margin + 2, yPosition + 2, imgSizeList, imgSizeList, '', 'FAST');
+                                    }
+                                } catch (_) {}
+                            }
+
+                            // Nombre
+                            doc.setFont(undefined, 'bold');
+                            doc.setTextColor(55, 55, 55);
+                            doc.setFontSize(9);
+                            doc.text(product.nombre, margin + imgSizeList + 5, yPosition + rowH / 2, { baseline: 'middle' });
+
+                            // Precio
+                            doc.setFont(undefined, 'bold');
+                            doc.setTextColor(22, 160, 133);
+                            doc.setFontSize(11);
+                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
+                            doc.text(precio, pageWidth - margin - 3, yPosition + rowH / 2, { align: 'right', baseline: 'middle' });
+
+                            yPosition += rowH;
+                        }
                         yPosition += 5;
                     }
                 }

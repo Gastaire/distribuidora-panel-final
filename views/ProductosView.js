@@ -11,9 +11,10 @@
  * para el componente principal `App`.
  */
 
-const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos, loading, error, onRefresh, onShowPdfOptionsModal }) => {
+const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos, loading, error, onRefresh, onShowPdfOptionsModal, categorias }) => {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [showArchived, setShowArchived] = React.useState(false);
+    const [quickEditIndex, setQuickEditIndex] = React.useState(null); // null = cerrado
 
     React.useEffect(() => {
         onRefresh(showArchived);
@@ -91,6 +92,16 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
 
     return (
         <div>
+            {/* QuickEdit Modal */}
+            {quickEditIndex !== null && (
+                <QuickEditModal
+                    productos={filteredProductos.filter(p => !p.archivado)}
+                    initialIndex={quickEditIndex}
+                    categorias={categorias || []}
+                    onClose={() => setQuickEditIndex(null)}
+                    onSaved={() => onRefresh(showArchived)}
+                />
+            )}
             {confirmArchive && (
                 <PasswordConfirmModal
                     title={`¿Archivar "${confirmArchive.nombre}"?`}
@@ -158,6 +169,15 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                                         <td className="px-6 py-4 text-sm"><StockBadge producto={producto} /></td>
                                         {isAdmin && (
                                             <td className="px-6 py-4 text-right text-sm font-medium space-x-4">
+                                                <button
+                                                    title="Edición rápida (imagen, stock, categoría)"
+                                                    onClick={() => {
+                                                        const idx = filteredProductos.filter(p => !p.archivado).findIndex(p => p.id === producto.id);
+                                                        setQuickEditIndex(idx >= 0 ? idx : 0);
+                                                    }}
+                                                    className="text-purple-500 hover:text-purple-700 text-lg leading-none"
+                                                    aria-label="Edición rápida"
+                                                >⚡</button>
                                                 <a href="#" onClick={(e) => { e.preventDefault(); onShowProductoForm(producto); }} className="text-blue-600 hover:text-blue-900">Editar</a>
                                                 {producto.archivado ? (
                                                     <a href="#" onClick={(e) => { e.preventDefault(); setConfirmRestore(producto); }} className="text-green-600 hover:text-green-900">Restaurar</a>
@@ -198,6 +218,14 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                                     </div>
                                     {isAdmin && (
                                         <div className="flex flex-col gap-1 shrink-0 text-xs">
+                                            <button
+                                                onClick={() => {
+                                                    const idx = filteredProductos.filter(p => !p.archivado).findIndex(p => p.id === producto.id);
+                                                    setQuickEditIndex(idx >= 0 ? idx : 0);
+                                                }}
+                                                className="text-purple-600 font-semibold py-1 px-2 rounded bg-purple-50"
+                                                title="Edición rápida"
+                                            >⚡ Quick</button>
                                             <button onClick={() => onShowProductoForm(producto)} className="text-blue-600 font-semibold py-1 px-2 rounded bg-blue-50">Editar</button>
                                             {producto.archivado ? (
                                                 <button onClick={() => setConfirmRestore(producto)} className="text-green-600 font-semibold py-1 px-2 rounded bg-green-50">Restaurar</button>
