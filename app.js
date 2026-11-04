@@ -60,7 +60,7 @@
             );
         
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                <DialogFrame onClose={onClose} busy={loading} label="Exportar a PDF">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-xl font-bold text-gray-800">Exportar a PDF</h2>
@@ -117,13 +117,13 @@
                             </button>
                         </div>
                     </div>
-                </div>
+                </DialogFrame>
             );
         };
 
         const LogsModal = ({ logs, pedidoId, onClose }) => {
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex justify-center items-center p-4">
+                <DialogFrame onClose={onClose} busy={false} label="Historial del pedido" layer={60}>
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-xl font-bold text-gray-800">Historial del Pedido #{pedidoId}</h2>
@@ -150,7 +150,7 @@
                             <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cerrar</button>
                         </div>
                     </div>
-                </div>
+                </DialogFrame>
             );
         };
 
@@ -354,7 +354,7 @@
             return (
                 <React.Fragment>
                     {showLogs && <LogsModal logs={logs} pedidoId={pedidoId} onClose={() => setShowLogs(false)} />}
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                    <DialogFrame onClose={onClose} busy={loading || guardandoNotas} label="Detalle del pedido">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border-b gap-3">
                                 <h2 className="text-xl font-bold text-gray-800">Detalle del Pedido #{pedidoId}</h2>
@@ -470,7 +470,7 @@
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </DialogFrame>
                     {pedido && (
                         <React.Fragment>
                             <PrintableView pedido={pedido} total={totalPedido} notasParaImprimir={notasEditables} />
@@ -710,7 +710,7 @@
             };
 
             return (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                 <DialogFrame onClose={onClose} busy={loading} label="Importar productos">
                     <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b"><h2 className="text-xl font-bold text-gray-800">Importar Productos desde CSV</h2><button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon/></button></div>
                         <div className="p-6 overflow-y-auto space-y-4">
@@ -745,7 +745,7 @@
                             </button>
                         </div>
                     </form>
-                </div>
+                </DialogFrame>
             );
         };
 
@@ -795,7 +795,7 @@
             };
 
             return (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                 <DialogFrame onClose={onClose} busy={loading} label="Importar ventas presenciales">
                     <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-xl font-bold text-gray-800">Importar Ventas Presenciales (CSV)</h2>
@@ -820,7 +820,7 @@
                             </button>
                         </div>
                     </form>
-                </div>
+                </DialogFrame>
             );
         };
 
@@ -875,12 +875,12 @@
                         return <ConfiguracionZonasView />;
                     case 'dashboard': 
                     default:
-                        return <DashboardView onShowImportVentasModal={onShowImportVentasModal} />;
+                        return <DashboardView onShowImportVentasModal={onShowImportVentasModal} onNavigate={handleNavItemClick} />;
                 }
             };
 
             return (
-                <div className="flex h-screen bg-gray-100 font-sans">
+                <div className="admin-shell flex h-screen bg-gray-100 font-sans">
                     {/* Overlay para cerrar el menú en móvil */}
                     {isSidebarOpen && (
                         <div 
@@ -893,10 +893,11 @@
                     <aside className={`fixed inset-y-0 left-0 bg-gray-800 text-white flex flex-col shrink-0 w-64 z-30 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                         <div className="h-20 flex items-center justify-center border-b border-gray-700">
                             <PackageIcon className="h-8 w-8 mr-2" />
-                            <span className="text-xl font-bold">Distribuidora</span>
+                            <div><span className="text-xl font-bold">DistriMaxi</span><p className="brand-caption">ADMINISTRACIÓN</p></div>
                         </div>
-                        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-                            <NavItem icon={<HomeIcon />} text="Dashboard" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
+                        <nav aria-label="Navegación principal" className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                            <p className="nav-caption">ESPACIO DE TRABAJO</p>
+                            <NavItem icon={<HomeIcon />} text="Resumen" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
                             <NavItem icon={<ShoppingCartIcon />} text="Pedidos" active={currentPage === 'pedidos'} onClick={() => handleNavItemClick('pedidos')} />
                             {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
@@ -908,6 +909,7 @@
                             {isAdmin && (
                                 <div>
                                     <button
+                                        aria-expanded={isAdminOpen}
                                         onClick={() => setIsAdminOpen(o => !o)}
                                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors mt-2 ${
                                             ['usuarios','actividad'].includes(currentPage)
@@ -940,16 +942,16 @@
                     
                     <div className="flex-1 flex flex-col overflow-hidden">
                         {/* Barra Superior con Botón de Hamburguesa */}
-                        <header className="md:hidden bg-white shadow-md p-4 flex justify-between items-center">
-                            <button onClick={() => setIsSidebarOpen(true)} className="text-gray-600">
+                        <header className="admin-topbar bg-white p-4 flex justify-between items-center">
+                            <button aria-label="Abrir navegación" onClick={() => setIsSidebarOpen(true)} className="md:hidden text-gray-600">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                             </button>
-                            <h1 className="text-lg font-bold text-gray-800 capitalize">{currentPage}</h1>
-                            <div></div> {/* Espaciador */}
+                            <p className="text-sm text-gray-500">Administración <span className="mx-2 text-gray-300">/</span><span className="font-semibold text-gray-800">{{ dashboard: 'Resumen', pedidos: 'Pedidos', reportes: 'Reportes', productos: 'Productos', categorias: 'Categorías', clientes: 'Clientes', zonas: 'Zonas', usuarios: 'Usuarios', actividad: 'Actividad', integridad: 'Integridad' }[currentPage] || currentPage}</span></p>
+                            <span className="hidden sm:block text-xs text-gray-500">{user.nombre} · <span className="capitalize">{user.rol}</span></span>
                         </header>
                         
                         {/* Contenido Principal */}
-                        <main className="flex-1 p-4 md:p-8 overflow-y-auto">{renderContent()}</main>
+                        <main id="contenido" className="admin-content flex-1 p-4 md:p-8 overflow-y-auto">{renderContent()}</main>
                     </div>
                 </div>
             );

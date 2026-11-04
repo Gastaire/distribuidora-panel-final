@@ -66,11 +66,11 @@ const UsuarioFormModal = ({ usuario, onClose, onSuccess }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+        <DialogFrame onClose={onClose} busy={loading} label="Usuario">
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
                 <div className="flex justify-between items-center p-4 border-b">
                     <h2 className="text-xl font-bold text-gray-800">{isEditing ? 'Editar Usuario' : 'Agregar Usuario'}</h2>
-                    <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon/></button>
+                    <button type="button" aria-label="Cerrar formulario" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon/></button>
                 </div>
                 <div className="p-6 overflow-y-auto space-y-4">
                     <div>
@@ -100,6 +100,6 @@ const UsuarioFormModal = ({ usuario, onClose, onSuccess }) => {
                     <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">{loading ? 'Guardando...' : 'Guardar Usuario'}</button>
                 </div>
             </form>
-        </div>
+        </DialogFrame>
     );
 };

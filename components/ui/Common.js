@@ -11,7 +11,12 @@
  * para todos los demás scripts que se carguen después.
  */
 
-const NavItem = ({ icon, text, active, onClick }) => (<a href="#" onClick={onClick} className={`flex items-center px-4 py-3 rounded-lg transition-colors duration-200 ${ active ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }`}><span className="mr-3">{icon}</span><span className="font-medium">{text}</span></a>);
+const NavItem = ({ icon, text, active, onClick }) => (
+    <button type="button" aria-current={active ? 'page' : undefined} onClick={onClick}
+        className={`admin-nav-item w-full text-left flex items-center px-4 py-3 rounded-lg transition-colors duration-200 ${active ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
+        <span className="mr-3" aria-hidden="true">{icon}</span><span className="font-medium">{text}</span>
+    </button>
+);
 
 const EstadoBadge = ({ estado }) => {
     const estados = { pendiente: 'Pendiente', visto: 'Visto', en_preparacion: 'En Preparación', facturado: 'Facturado', listo_para_entrega: 'Listo p/ Entrega', entregado: 'Entregado', cancelado: 'Cancelado', archivado: 'Archivado' };

@@ -4,13 +4,13 @@
  * Evolución de Ingresos (comparativa semanal + año anterior con Chart.js)
  */
 
-const DashboardView = ({ onShowImportVentasModal }) => {
+const DashboardView = ({ onShowImportVentasModal, onNavigate }) => {
     const token = localStorage.getItem('token');
 
     const today = new Date();
     const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(today.getDate() - 30);
-    const fmt = (d) => d.toISOString().split('T')[0];
+    const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
     const [startDate,    setStartDate]    = React.useState(fmt(thirtyDaysAgo));
     const [endDate,      setEndDate]      = React.useState(fmt(today));
@@ -19,6 +19,15 @@ const DashboardView = ({ onShowImportVentasModal }) => {
     const [loading,      setLoading]      = React.useState(true);
     const [error,        setError]        = React.useState(null);
     const [fetchTrigger, setFetchTrigger] = React.useState(0);
+    const [updatedAt, setUpdatedAt] = React.useState(null);
+    const invalidDates = !startDate || !endDate || startDate > endDate;
+    const selectPeriod = (days) => {
+        const end = new Date();
+        const start = new Date(end);
+        start.setDate(start.getDate() - (days - 1));
+        setStartDate(fmt(start));
+        setEndDate(fmt(end));
+    };
 
     const topProductsRef  = React.useRef(null);
     const topFaltantesRef = React.useRef(null);
@@ -33,32 +42,35 @@ const DashboardView = ({ onShowImportVentasModal }) => {
     };
 
     React.useEffect(() => {
+        if (invalidDates) { setLoading(false); return; }
+        const controller = new AbortController();
         setLoading(true);
         setError(null);
+        setStats(null);
         let isMounted = true;
         const doFetch = async () => {
             try {
                 const url = `${API_URL}/dashboard/stats?source=${dataSource}&startDate=${startDate}&endDate=${endDate}&topProductsLimit=10`;
-                const response = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                const response = await fetch(url, { signal: controller.signal, headers: { 'Authorization': `Bearer ${token}` } });
                 if (!response.ok) {
                     const errData = await response.json();
                     throw new Error(errData.message || 'No se pudieron cargar las estadísticas.');
                 }
                 const data = await response.json();
-                if (isMounted) setStats(data);
+                if (isMounted) { setStats(data); setUpdatedAt(new Date()); }
             } catch (err) {
-                if (isMounted) setError(err.message);
+                if (isMounted && err.name !== 'AbortError') setError(err.message);
             } finally {
                 if (isMounted) setLoading(false);
             }
         };
         doFetch();
-        return () => { isMounted = false; destroyCharts(); };
+        return () => { isMounted = false; controller.abort(); destroyCharts(); };
     }, [startDate, endDate, dataSource, token, fetchTrigger]);
 
     // ── Inicializar gráficos cuando cambia stats ────────────────────────────
     React.useEffect(() => {
-        if (!stats) return;
+        if (!stats || loading || error || invalidDates) return;
         destroyCharts();
 
         // ── Gráfico A: Top 10 Más Vendidos ────────────────────────────────
@@ -101,7 +113,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
         // ── Gráfico B: Top Faltantes ──────────────────────────────────────
         const topFaltCanvas = topFaltantesRef.current;
-        if (topFaltCanvas && stats.topFaltantes && stats.topFaltantes.length > 0) {
+        if (dataSource === 'pedidos' && topFaltCanvas && stats.topFaltantes && stats.topFaltantes.length > 0) {
             chartInstances.current.topFaltantes = new Chart(topFaltCanvas, {
                 type: 'bar',
                 data: {
@@ -155,7 +167,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
             for (let i = 6; i >= 0; i--) {
                 const d = new Date(now);
                 d.setDate(now.getDate() - i);
-                const ds = d.toISOString().split('T')[0];
+                const ds = fmt(d);
                 labels14.push(DIAS[d.getDay()]);
 
                 const rowActual = data14.find(r => r.dia && r.dia.startsWith(ds));
@@ -163,7 +175,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
                 const dp = new Date(d);
                 dp.setDate(d.getDate() - 7);
-                const dps = dp.toISOString().split('T')[0];
+                const dps = fmt(dp);
                 const rowAnterior = data14.find(r => r.dia && r.dia.startsWith(dps));
                 semAnterior.push(rowAnterior ? parseFloat(rowAnterior.ingresos) : 0);
             }
@@ -242,10 +254,11 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 }
             });
         }
-    }, [stats]);
+        return destroyCharts;
+    }, [stats, loading, error, invalidDates]);
 
-    const fmtMoney = (v) => `$${parseFloat(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-    const fmtNum   = (v) => parseFloat(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 });
+    const fmtMoney = (v) => v === null || v === undefined || !Number.isFinite(Number(v)) ? '—' : Number(v).toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
+    const fmtNum   = (v) => v === null || v === undefined || !Number.isFinite(Number(v)) ? '—' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 3 });
 
     const noDataMsg = (msg = 'Sin datos para el período seleccionado') => (
         <div className="flex flex-col items-center justify-center h-full text-gray-400 py-8">
@@ -257,7 +270,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
     );
 
     // ── KPI Card genérico ─────────────────────────────────────────────────────
-    const KpiCard = ({ title, value, sub, icon, accent = 'blue', badge = null }) => {
+    const KpiCard = ({ title, value, sub, icon, accent = 'blue', badge = null, action = null }) => {
         const accents = {
             blue:   'bg-blue-50 border-blue-100 text-blue-600',
             green:  'bg-green-50 border-green-100 text-green-600',
@@ -267,30 +280,31 @@ const DashboardView = ({ onShowImportVentasModal }) => {
             indigo: 'bg-indigo-50 border-indigo-100 text-indigo-600',
         };
         return (
-            <div className={`rounded-xl border p-4 shadow-sm ${accents[accent]} flex flex-col gap-1`}>
+            <div className={`kpi-card rounded-xl border p-4 shadow-sm ${accents[accent]} flex flex-col gap-1`}>
                 <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wide opacity-70">{title}</span>
                     {badge && <span className="text-xs font-bold bg-white bg-opacity-60 px-2 py-0.5 rounded-full">{badge}</span>}
                 </div>
                 <p className="text-2xl font-black">{value}</p>
                 {sub && <p className="text-xs opacity-70">{sub}</p>}
+                {action && onNavigate && <button type="button" onClick={() => onNavigate(action.page)} className="kpi-action text-xs text-left font-semibold mt-2">{action.label} <span aria-hidden="true">↗</span></button>}
             </div>
         );
     };
 
     return (
-        <div className="space-y-6">
+        <div className="dashboard-view space-y-6">
 
             {/* ── Header ──────────────────────────────────────────────────────── */}
             <div className="flex flex-col gap-3 md:flex-row md:justify-between md:items-end">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-800">Centro de Operaciones</h1>
-                    <p className="text-gray-500 mt-0.5">Visión operativa de ventas, clientes y productos.</p>
+                    <h1 className="text-3xl font-bold text-gray-800">Tu negocio, de un vistazo</h1>
+                    <p className="text-gray-500 mt-0.5">Ventas, demanda y oportunidades para decidir mejor.</p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
                     <div className="flex items-center gap-1 bg-gray-200 p-1 rounded-lg">
-                        <button onClick={() => setDataSource('pedidos')}   className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${dataSource === 'pedidos'    ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>App</button>
-                        <button onClick={() => setDataSource('presencial')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${dataSource === 'presencial' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Presencial</button>
+                        <button aria-pressed={dataSource === 'pedidos'} onClick={() => setDataSource('pedidos')}   className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${dataSource === 'pedidos'    ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Pedidos de la app</button>
+                        <button aria-pressed={dataSource === 'presencial'} onClick={() => setDataSource('presencial')} className={`px-3 py-1.5 text-sm font-semibold rounded-md transition-colors ${dataSource === 'presencial' ? 'bg-white shadow text-blue-600' : 'text-gray-600 hover:text-gray-800'}`}>Presencial</button>
                     </div>
                     <button onClick={onShowImportVentasModal} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0 shadow transition-colors">
                         <UploadIcon className="h-5 w-5 mr-2" /> Importar
@@ -301,25 +315,31 @@ const DashboardView = ({ onShowImportVentasModal }) => {
             {/* ── Filtros de fecha ─────────────────────────────────────────────── */}
             <div className="flex flex-wrap items-end gap-3 bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
                 <div>
-                    <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
+                    <label htmlFor="dashboard-desde" className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
                     <input
-                        type="date"
+                        id="dashboard-desde" type="date"
+                        max={endDate || undefined}
                         value={startDate}
                         onChange={e => setStartDate(e.target.value)}
                         className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36 bg-gray-50"
                     />
                 </div>
                 <div>
-                    <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
+                    <label htmlFor="dashboard-hasta" className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
                     <input
-                        type="date"
+                        id="dashboard-hasta" type="date"
+                        min={startDate || undefined}
                         value={endDate}
                         onChange={e => setEndDate(e.target.value)}
                         className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36 bg-gray-50"
                     />
                 </div>
+                <div className="flex flex-wrap gap-2" aria-label="Períodos rápidos">
+                    {[1, 7, 30].map(days => <button type="button" key={days} onClick={() => selectPeriod(days)} className="period-button text-sm px-3 py-2 border rounded-lg">{days === 1 ? 'Hoy' : `Últimos ${days} días`}</button>)}
+                </div>
                 <div className="flex-1" />
                 <button
+                    disabled={loading || invalidDates}
                     onClick={() => setFetchTrigger(t => t + 1)}
                     className="bg-gray-800 hover:bg-gray-900 text-white text-sm font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-colors"
                 >
@@ -328,10 +348,12 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                 </button>
             </div>
 
+            {invalidDates && <p role="alert" className="text-red-700 bg-red-50 p-3 rounded-lg">Elegí un rango válido: la fecha inicial debe ser anterior o igual a la final.</p>}
+            {updatedAt && !loading && !error && !invalidDates && <p role="status" className="text-xs text-gray-500">Actualizado a las {updatedAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} · Los indicadores del período corresponden a las fechas seleccionadas.</p>}
             {loading && <div className="flex justify-center p-16"><Spinner className="border-blue-500 h-10 w-10" /></div>}
             {error   && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl" role="alert"><p className="font-bold">Error al cargar</p><p className="text-sm mt-1">{error}</p></div>}
 
-            {stats && !loading && (
+            {stats && !loading && !error && !invalidDates && (
                 <div className="space-y-6">
 
                     {/* ── KPIs fila 1: operativo en tiempo real (solo App) ───────── */}
@@ -339,26 +361,28 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <KpiCard
                                 title="Pedidos Pendientes"
+                                action={{ page: 'pedidos', label: 'Ver pedidos' }}
                                 value={fmtNum(stats.pedidos_pendientes)}
-                                sub="Esperando atención ahora"
+                                sub="Pendientes creados en los últimos 7 días"
                                 accent={parseInt(stats.pedidos_pendientes) > 10 ? 'red' : 'amber'}
                             />
                             <KpiCard
-                                title="Facturados (12hs)"
+                                title="Facturados recientes"
                                 value={fmtNum(stats.facturados_12h)}
-                                sub="Últimas 12 horas"
+                                sub="Estado facturado · creados hace menos de 12 h"
                                 accent="green"
                             />
                             <KpiCard
                                 title="Clientes Activos"
+                                action={{ page: 'clientes', label: 'Ver clientes' }}
                                 value={fmtNum(stats.activeCustomers)}
                                 sub={`de ${fmtNum(stats.totalCustomers)} totales · período`}
                                 accent="indigo"
                             />
                             <KpiCard
-                                title="Eficacia de Retención"
+                                title="Cobertura de clientes"
                                 value={stats.totalCustomers > 0 ? `${Math.round((stats.activeCustomers / stats.totalCustomers) * 100)}%` : '—'}
-                                sub="Clientes activos / total"
+                                sub="Clientes con pedidos en el período / total"
                                 accent={stats.totalCustomers > 0 && (stats.activeCustomers / stats.totalCustomers) > 0.6 ? 'green' : 'amber'}
                             />
                         </div>
@@ -366,7 +390,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
                     {/* ── KPIs fila 2: métricas del período ─────────────────────── */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <KpiCard title="Ingresos Totales"  value={fmtMoney(stats.totalRevenue)}   accent="green" />
+                        <KpiCard title={dataSource === 'pedidos' ? "Valor de pedidos" : "Ventas presenciales"} value={fmtMoney(stats.totalRevenue)} sub={dataSource === 'pedidos' ? "Excluye cancelados y archivados · no equivale a cobros" : "Comprobantes importados del período"} accent="green" />
                         <KpiCard title="Transacciones"     value={fmtNum(stats.totalOrders)}      accent="blue" />
                         <KpiCard title="Ticket Promedio"   value={fmtMoney(stats.totalOrders > 0 ? stats.totalRevenue / stats.totalOrders : 0)} accent="purple" />
                         <KpiCard title="Unidades Vendidas" value={fmtNum(stats.unidadesVendidas)} accent="indigo" />
@@ -376,9 +400,10 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                     {dataSource === 'pedidos' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <KpiCard
-                                title="Ventas Perdidas (Faltantes)"
+                                title="Valor estimado de faltantes"
+                                action={{ page: 'productos', label: 'Revisar productos' }}
                                 value={fmtMoney(stats.lostRevenue)}
-                                sub={`${fmtNum(stats.lostUnits)} unidades sin stock en el período`}
+                                sub={`${fmtNum(stats.lostUnits)} unidades · estimación a precios actuales`}
                                 accent="red"
                             />
                         </div>
@@ -389,8 +414,8 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
                             <div className="flex justify-between items-start mb-1">
                                 <div>
-                                    <h3 className="font-bold text-gray-700">📈 Evolución de Ingresos — Comparativa Semanal</h3>
-                                    <p className="text-xs text-gray-400 mt-0.5">Esta semana vs. semana anterior · línea punteada = mismo período año pasado (referencia)</p>
+                                    <h3 className="font-bold text-gray-700">Evolución del valor de pedidos</h3>
+                                    <p className="text-xs text-gray-400 mt-0.5">Últimos 7 días vs. 7 anteriores, independientemente del filtro · año anterior: referencia agregada por día de semana</p>
                                 </div>
                             </div>
                             <div className="relative" style={{ height: '240px' }}>
@@ -407,7 +432,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col">
                             <div className="flex justify-between items-center mb-1">
-                                <h3 className="font-bold text-gray-700">🏆 Top 10 Más Vendidos</h3>
+                                <h3 className="font-bold text-gray-700">Productos más vendidos</h3>
                                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">unidades · período</span>
                             </div>
                             <p className="text-xs text-gray-400 mb-3">Productos con mayor volumen en el rango seleccionado</p>
@@ -419,7 +444,7 @@ const DashboardView = ({ onShowImportVentasModal }) => {
 
                         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col">
                             <div className="flex justify-between items-center mb-1">
-                                <h3 className="font-bold text-gray-700">⚠️ Top Faltantes del Período</h3>
+                                <h3 className="font-bold text-gray-700">Faltantes para priorizar</h3>
                                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">unidades removidas</span>
                             </div>
                             <p className="text-xs text-gray-400 mb-3">Productos más removidos por sin-stock</p>
