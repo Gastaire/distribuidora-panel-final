@@ -37,3 +37,12 @@ Se conserva el contrato de `/dashboard/stats` sin modificar la API:
 - Cobertura expresa clientes con pedidos en el período sobre clientes totales; no mide retención histórica.
 - Faltantes es una estimación a precios actuales del catálogo.
 - Evolución semanal usa los últimos días actuales, independientemente del filtro de fechas; el año anterior es una referencia agregada por día de semana.
+
+## Pedidos, zonas, productos y reportes
+
+`QA_DOCUMENTS=1 npm test` verifica ambos diseños con jsPDF real y guarda ejemplos ficticios en `/tmp/qa-price-list.pdf` y `/tmp/qa-catalog.pdf`.
+La suite intercepta cualquier ruta `/api/`, incluida la configuración actual que apunta a producción. Prueba un fallo HTTP al guardar zonas y verifica que el editor siga abierto; también comprueba el acceso al reporte diario y su manejo de error.
+
+Cambios adicionales: filtros de estado y contadores en pedidos, hoja de ruta para depósito conforme a los permisos existentes del backend, disponibilidad de productos considerando stock numérico, precios decimales, validación de cada escritura repetida de zonas, protección ante consultas obsoletas de reportes y calendario, y descarga de tablas visibles en CSV. Las repeticiones del calendario usan operaciones individuales del endpoint existente: si una falla, las anteriores permanecen guardadas y el mensaje lo indica. La API no ofrece una transacción de lote.
+
+La revista nueva es tipográfica, por categorías y precios; no incluye fotos. No se han agregado operaciones de combinación ni limpieza masiva de pedidos. Se mantienen los flujos existentes de edición, archivo, restauración, notas e impresión. La revisión de contratos se hizo contra el código local de la API; no se consultaron endpoints de producción.

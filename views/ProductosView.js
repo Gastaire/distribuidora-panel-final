@@ -12,6 +12,7 @@
  */
 
 const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos, loading, error, onRefresh, onShowPdfOptionsModal }) => {
+    const [stockFiltro, setStockFiltro] = React.useState('');
     const [searchTerm, setSearchTerm] = React.useState('');
     const [showArchived, setShowArchived] = React.useState(false);
 
@@ -86,7 +87,7 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
         }
     };
 
-    const filteredProductos = sortedProductos.filter(p => p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || (p.codigo_sku && p.codigo_sku.toLowerCase().includes(searchTerm.toLowerCase())));
+    const filteredProductos = sortedProductos.filter(p => (!stockFiltro || (p.controla_stock ? Number(p.stock_cantidad)>0 : p.stock==='Sí') === (stockFiltro==='disponible'))).filter(p => (p.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) || (p.codigo_sku && p.codigo_sku.toLowerCase().includes(searchTerm.toLowerCase())));
     const isAdmin = user.rol === 'admin';
 
     return (
@@ -127,7 +128,7 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                     <div className="flex gap-2 flex-wrap justify-start">
                         {isAdmin && <button onClick={onShowImportModal} className="bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0"><UploadIcon className="h-5 w-5 mr-2" /> Importar</button>}
                         <button onClick={handleExportCsv} className="bg-teal-500 hover:bg-teal-600 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0"><DownloadIcon className="h-5 w-5 mr-2" /> Exportar CSV</button>
-                        {isAdmin && <button onClick={onShowPdfOptionsModal} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0"><FileTextIcon className="h-5 w-5 mr-2" /> Exportar PDF</button>}
+                        {isAdmin && <button onClick={onShowPdfOptionsModal} className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0"><FileTextIcon className="h-5 w-5 mr-2" /> Generar lista</button>}
                         {isAdmin && (<button onClick={() => onShowProductoForm({})} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg flex items-center shrink-0"><PlusIcon className="h-5 w-5 mr-2" /> Agregar</button>)}
                     </div>
                 </div>

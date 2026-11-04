@@ -14,6 +14,8 @@ const ConfiguracionZonasView = () => {
         return new Date(hoy.getFullYear(), hoy.getMonth(), 1);
     });
     const [cronograma, setCronograma] = React.useState({});
+    const [saving, setSaving] = React.useState(false);
+    const loadVersion = React.useRef(0);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
     const [successMsg, setSuccessMsg] = React.useState(null);
@@ -75,6 +77,7 @@ const ConfiguracionZonasView = () => {
 
     // Cargar datos del mes
     const cargarMes = async () => {
+        const version = ++loadVersion.current;
         setLoading(true);
         setError(null);
         try {
@@ -93,16 +96,17 @@ const ConfiguracionZonasView = () => {
                 const key = item.fecha.split('T')[0];
                 mapa[key] = item.zonas;
             });
-            setCronograma(mapa);
+            if (version === loadVersion.current) setCronograma(mapa);
         } catch (e) {
-            setError(e.message);
+            if (version === loadVersion.current) setError(e.message);
         } finally {
-            setLoading(false);
+            if (version === loadVersion.current) setLoading(false);
         }
     };
 
     React.useEffect(() => {
         cargarMes();
+        return () => { loadVersion.current++; };
     }, [mesActual]);
 
     // Abrir modal al clickear un día
@@ -116,6 +120,10 @@ const ConfiguracionZonasView = () => {
 
     // Guardar evento
     const guardarEvento = async () => {
+        if (saving) return;
+        if (!zonaInput.trim()) { setError('Ingresá al menos una zona. Para quitarla usá Eliminar zona.'); return; }
+        if (repetir !== 'ninguno' && (!Number.isInteger(Number(repetirSemanas)) || Number(repetirSemanas)<1 || Number(repetirSemanas)>52)) { setError('Elegí entre 1 y 52 repeticiones.'); return; }
+        setSaving(true);
         try {
             setError(null);
             
@@ -133,11 +141,12 @@ const ConfiguracionZonasView = () => {
                 for (let i = 1; i <= parseInt(repetirSemanas); i++) {
                     const nuevaFecha = new Date(modalEvento.fecha);
                     nuevaFecha.setDate(nuevaFecha.getDate() + (incremento * i));
-                    await fetch(`${API_URL}/config/cronograma`, {
+                    const repeatedResponse = await fetch(`${API_URL}/config/cronograma`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ fecha: formatFecha(nuevaFecha), zonas: zonaInput })
                     });
+                    if (!repeatedResponse.ok) throw new Error(`No se pudo guardar ${formatFecha(nuevaFecha)}. Los días anteriores ya se guardaron; revisá el calendario antes de reintentar.`);
                 }
             }
 
@@ -147,22 +156,25 @@ const ConfiguracionZonasView = () => {
             cargarMes();
         } catch (e) {
             setError(e.message);
-        }
+        } finally { setSaving(false); }
     };
 
     // Borrar evento de un día
     const borrarEvento = async () => {
+        if (saving) return;
+        setSaving(true);
         try {
-            await fetch(`${API_URL}/config/cronograma`, {
+            const response = await fetch(`${API_URL}/config/cronograma`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ fecha: modalEvento.fechaStr, zonas: '' })
             });
+            if (!response.ok) throw new Error('No se pudo eliminar la zona.');
             setModalEvento(null);
             cargarMes();
         } catch (e) {
             setError(e.message);
-        }
+        } finally { setSaving(false); }
     };
 
     const diasSemana = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -214,7 +226,8 @@ const ConfiguracionZonasView = () => {
 
                             return (
                                 <div 
-                                    key={fechaStr} 
+                                    key={fechaStr} role="button" tabIndex={esPasado ? -1 : 0} aria-disabled={esPasado} aria-label={`Programar ${fechaStr}`}
+                                    onKeyDown={e=>{ if(!esPasado && (e.key==='Enter' || e.key===' ')){e.preventDefault();abrirModalDia(dia);} }}
                                     onClick={() => !esPasado && abrirModalDia(dia)}
                                     className={`min-h-[90px] border-b border-r p-1.5 transition ${esPasado ? 'opacity-40 cursor-not-allowed bg-gray-50' : 'cursor-pointer hover:bg-blue-50'} ${hoy ? 'bg-blue-50' : ''}`}
                                 >
@@ -235,8 +248,8 @@ const ConfiguracionZonasView = () => {
 
             {/* Modal de Evento */}
             {modalEvento && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
+                <DialogFrame label="Programar zonas de entrega" busy={saving} onClose={()=>setModalEvento(null)}>
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-lg font-bold text-gray-800 capitalize">{getNombreDiaLargo(modalEvento.fecha)}</h2>
                             <button onClick={() => setModalEvento(null)} className="text-gray-400 hover:text-gray-600">
@@ -244,7 +257,7 @@ const ConfiguracionZonasView = () => {
                             </button>
                         </div>
 
-                        <div className="p-4 space-y-4">
+                        <div className="p-4 space-y-4 overflow-y-auto">{error && <p role="alert" className="text-red-700 text-sm">{error}</p>}
                             {/* Zonas predefinidas como chips */}
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Zona / Localidad</label>
@@ -318,7 +331,7 @@ const ConfiguracionZonasView = () => {
                         <div className="flex items-center justify-between p-4 border-t bg-gray-50 rounded-b-xl">
                             <div>
                                 {cronograma[modalEvento.fechaStr] && (
-                                    <button onClick={borrarEvento} className="text-red-500 hover:text-red-700 text-sm font-medium">
+                                    <button disabled={saving} onClick={borrarEvento} className="text-red-500 hover:text-red-700 text-sm font-medium">
                                         Eliminar zona
                                     </button>
                                 )}
@@ -327,13 +340,13 @@ const ConfiguracionZonasView = () => {
                                 <button onClick={() => setModalEvento(null)} className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-100 text-sm font-medium transition">
                                     Cancelar
                                 </button>
-                                <button onClick={guardarEvento} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+                                <button disabled={saving} onClick={guardarEvento} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
                                     Guardar
                                 </button>
                             </div>
                         </div>
                     </div>
-                </div>
+                </DialogFrame>
             )}
         </div>
     );

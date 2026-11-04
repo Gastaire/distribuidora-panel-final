@@ -130,7 +130,7 @@ const ProductoFormModal = ({ producto, onClose, onSuccess, allCategories }) => {
                     {/* --- FIN DE LA MODIFICACIÓN --- */}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div><label htmlFor="precio_unitario" className="block text-sm font-medium text-gray-700">Precio</label><input type="number" name="precio_unitario" id="precio_unitario" value={formData.precio_unitario} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required /></div>
+                        <div><label htmlFor="precio_unitario" className="block text-sm font-medium text-gray-700">Precio</label><input type="number" min="0" step="0.01" name="precio_unitario" id="precio_unitario" value={formData.precio_unitario} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" required /></div>
                         <div><label htmlFor="codigo_sku" className="block text-sm font-medium text-gray-700">SKU (Código Interno)</label><input type="text" name="codigo_sku" id="codigo_sku" value={formData.codigo_sku} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" /></div>
                     </div>
                     <div className="grid grid-cols-1">

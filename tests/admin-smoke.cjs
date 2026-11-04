@@ -14,8 +14,10 @@ await page.route('**/*',async route=>{
   const file=path.join(root,url.pathname);if(!fs.existsSync(file))return route.fulfill({status:404,body:'Missing'});
   const body=fs.readFileSync(file,'utf8');return route.fulfill({body:file.endsWith('.js')?babel.transform(body,{presets:[['react',{runtime:'classic'}]]}).code:body,contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'application/json'});
  }
- if(url.hostname==='staging-api.distrimaxi.site'){
+ if(url.pathname.startsWith('/api/')){
  calls.push({path:url.pathname,search:url.search,method:route.request().method(),body:route.request().postData()});
+ if (url.pathname.includes('/config/cronograma') && route.request().method()==='PUT')return route.fulfill({status:500,json:{message:'Fallo simulado de guardado'}});
+ if(url.pathname.includes('/reportes/'))return route.fulfill({status:500,json:{message:'Reporte no disponible'}});
  let body=url.pathname.endsWith('/productos') ? {productos:[],categorias:[]} : [];if(url.pathname.includes('/dashboard/stats'))body=fail?{message:'Error de prueba'}:stats;
  else if(url.pathname.endsWith('/auth/profile')||url.pathname.endsWith('/auth/me'))body={id:1,nombre:'Admin de prueba',rol:'admin'};
  return route.fulfill({status:fail&&url.pathname.includes('/dashboard/stats')?500:200,json:body});
@@ -24,6 +26,7 @@ await page.route('**/*',async route=>{
  if(url.href.includes('react-dom@17/'))return route.fulfill({path:require.resolve('react-dom/umd/react-dom.development.js'),contentType:'application/javascript'});
  if(url.href.includes('chart.js') && process.env.QA_REAL_CHARTS === '1')return route.continue();
  if(url.href.includes('chart.js'))return route.fulfill({body:'window.Chart=class{static instances=[];constructor(canvas,config){this.canvas=canvas;this.config=config;this.destroyed=false;Chart.instances.push(this)}destroy(){this.destroyed=true}};',contentType:'application/javascript'});
+ if(url.href.includes('jspdf'))return route.continue();
  if(url.href.includes('tailwindcss'))return route.continue();
  return route.fulfill({body:'',contentType:'application/javascript'});
 });
@@ -73,6 +76,27 @@ for (const [nav,label,button] of [['Productos','Producto','Agregar'],['Clientes'
  await dialog.waitFor({state:'detached'});
  assert.ok(calls.some(c=>c.method==='POST'&&c.path.endsWith('/'+({Producto:'productos',Cliente:'clientes',Usuario:'usuarios'}[label]))));
 }
+await page.getByRole('navigation').getByRole('button',{name:'Resumen',exact:true}).click();await dashboardReady();
+// Local document generation uses synthetic catalog data, never production records.
+if (process.env.QA_DOCUMENTS === '1') {
+ for(const format of ['price-list','catalog']){
+  const download=page.waitForEvent('download');
+  await page.evaluate(format=>generatePriceDocument({products:Array.from({length:30},(_,i)=>({id:i,nombre:`Producto de prueba ${i} con descripción comercial extendida`,codigo_sku:`SKU-${i}`,categoria:i<16?'Almacén':'Bebidas y especialidades',precio_unitario:1234.56+i,stock:'Sí'})),options:{format,stock:'in-stock'}}),format);
+  await (await download).saveAs(`/tmp/qa-${format}.pdf`);
+ }
+}
+await page.getByRole('navigation').getByRole('button',{name:'Zonas',exact:true}).click();
+await page.locator('[role="button"][aria-disabled="false"]').last().click();
+await page.getByRole('dialog',{name:'Programar zonas de entrega'}).waitFor();
+await page.getByPlaceholder('Seleccioná arriba o escribí otro destino').fill('Zona de prueba');
+await page.getByRole('button',{name:'Guardar',exact:true}).click();
+await page.getByRole('dialog').getByRole('alert').waitFor();
+assert.equal(await page.getByRole('dialog').count(),1,'Failed zone save keeps editor open');
+await page.keyboard.press('Escape');
+await page.getByRole('navigation').getByRole('button',{name:'Reportes',exact:true}).click();
+await page.getByRole('button',{name:'Operación diaria',exact:true}).click();
+await page.getByText('Error al cargar /reportes/diario-pedidos',{exact:false}).waitFor();
+assert.ok(calls.some(c=>c.path.endsWith('/reportes/diario-pedidos')));
 await page.getByRole('navigation').getByRole('button',{name:'Resumen',exact:true}).click();await dashboardReady();
 await page.screenshot({path:process.env.QA_SCREENSHOT || '/tmp/distrimaxi-panel-desktop.png',fullPage:true,animations:'disabled'});
 await page.setViewportSize({width:390,height:844});

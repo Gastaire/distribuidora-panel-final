@@ -60,10 +60,10 @@
             );
         
             return (
-                <DialogFrame onClose={onClose} busy={loading} label="Exportar a PDF">
+                <DialogFrame onClose={onClose} busy={loading} label="Generar lista">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
                         <div className="flex justify-between items-center p-4 border-b">
-                            <h2 className="text-xl font-bold text-gray-800">Exportar a PDF</h2>
+                            <h2 className="text-xl font-bold text-gray-800">Generar lista</h2>
                             <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon /></button>
                         </div>
                         <div className="p-6 space-y-6">
@@ -71,7 +71,7 @@
                                 <h3 className="text-lg font-semibold text-gray-700 mb-2">1. Elige el formato</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <OptionButton 
-                                        label="Lista de Precios"
+                                        label="Lista de precios"
                                         description="Un listado compacto, organizado por categorías. Ideal para imprimir."
                                         value="price-list"
                                         type="format"
@@ -79,8 +79,8 @@
                                         onSelect={handleOptionChange}
                                     />
                                     <OptionButton 
-                                        label="Catálogo con Fotos"
-                                        description="Muestra los productos en cuadrícula con imágenes destacadas."
+                                        label="Revista de precios"
+                                        description="Diseño editorial por categorías, productos y precios destacados."
                                         value="catalog"
                                         type="format"
                                         selectedValue={options.format}
@@ -113,7 +113,7 @@
                         <div className="p-4 border-t bg-gray-50 flex justify-end items-center gap-4">
                             <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
                             <button type="button" onClick={handleSubmit} disabled={loading} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
-                                {loading ? <><Spinner className="mr-2"/>Generando...</> : 'Generar PDF'}
+                                {loading ? <><Spinner className="mr-2"/>Generando...</> : 'Generar lista'}
                             </button>
                         </div>
                     </div>
@@ -1067,373 +1067,11 @@
 
             const generatePdf = (options) => {
                 setPdfLoading(true);
-                const { jsPDF } = window.jspdf;
-                if (!jsPDF) {
-                    alert("Error: La librería jsPDF no está cargada.");
-                    setPdfLoading(false);
-                    return;
-                }
-                
-                // Crear documento PDF en formato A4 (siempre vertical para ambos formatos)
-                const doc = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'mm',
-                    format: 'a4'
-                });
-                
-                // Constantes para márgenes y dimensiones
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const pageHeight = doc.internal.pageSize.getHeight();
-                const margin = 5; // Margen general reducido para aprovechar más espacio
-                const contentWidth = pageWidth - (margin * 2);
-                
-                // 1. Filtrar productos según las opciones
-                let productosFiltrados = [...productos];
-                if (options.stock === 'in-stock') {
-                    productosFiltrados = productosFiltrados.filter(p => p.stock === 'Sí');
-                }
-            
-                // 2. Agrupar por categoría
-                const groupedProducts = productosFiltrados.reduce((acc, product) => {
-                    const category = product.categoria || 'Sin Categoría';
-                    if (!acc[category]) acc[category] = [];
-                    acc[category].push(product);
-                    return acc;
-                }, {});
-            
-                const sortedCategories = Object.keys(groupedProducts).sort();
-            
-                // 3. Diseño del PDF - Encabezado general
-                // Crear un fondo para el encabezado
-                doc.setFillColor(22, 160, 133); // Color verde corporativo
-                doc.rect(0, 0, pageWidth, 25, 'F');
-                
-                // Título principal
-                doc.setFontSize(22);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(255, 255, 255); // Texto blanco sobre fondo verde
-                doc.text("Lista de Precios", pageWidth / 2, 15, { align: 'center' });
-                
-                // Subtítulos
-                doc.setFontSize(9);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(240, 240, 240); // Gris claro para los subtítulos
-                doc.text(`Generado por: ${user.nombre}`, margin, 22);
-                doc.text(`Fecha: ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 22, { align: 'right' });
-            
-                let yPosition = 35; // Posición inicial tras el encabezado
-            
-                // Colores para alternar entre categorías
-                const categoryColors = [
-                    [26, 188, 156], // Verde turquesa
-                    [41, 128, 185], // Azul
-                    [142, 68, 173], // Púrpura
-                    [192, 57, 43]   // Rojo
-                ];
-                
-                if (options.format === 'catalog') {
-                    // FORMATO CATÁLOGO (CUADRÍCULA) - AHORA EN VERTICAL CON MANEJO MEJORADO DE IMÁGENES
-                    // Parámetros para la cuadrícula de 4x5
-                    const cols = 4; // 4 columnas
-                    const itemWidth = (contentWidth - ((cols-1) * 2)) / cols; // Ancho de cada celda con pequeño gap
-                    const imgSize = itemWidth - 4; // Tamaño de la imagen ajustado para dejar margen
-                    const itemHeight = imgSize + 20; // Alto para imagen + texto y precio
-                    
-                    // Crear una imagen de marcador de posición
-                    const placeholderImgData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBNYWNpbnRvc2giIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OENDRjNBN0E2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OENDRjNBN0I2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4Q0NGM0E3ODY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4Q0NGM0E3OTY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0IGVuZD0iciI/PqqezsUAAAAfSURBVHjaYmRgYJD6//8/AwMDEwMDAwMDEAMDAAMBAQB+EXF/AAAAABJRU5ErkJggg==';
-                    
-                    let colorIndex = 0; // Para alternar colores entre categorías
-                    
-                    for (const category of sortedCategories) {
-                        const productsInCategory = groupedProducts[category];
-                        
-                        // Si la categoría no tiene productos después del filtrado, la saltamos
-                        if (!productsInCategory || productsInCategory.length === 0) {
-                            continue;
-                        }
-            
-                        // Agregar una página nueva si no hay suficiente espacio
-                        if (yPosition > pageHeight - 40) {
-                            doc.addPage();
-                            yPosition = 15;
-                        }
-            
-                        // TÍTULO DE CATEGORÍA MEJORADO
-                        const categoryColor = categoryColors[colorIndex % categoryColors.length];
-                        colorIndex++;
-                        
-                        // Fondo de título con degradado
-                        doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
-                        doc.roundedRect(margin, yPosition, contentWidth, 10, 2, 2, 'F');
-                        
-                        // Texto del título
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(14);
-                        doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
-                        
-                        yPosition += 14;
-            
-                        // Dibujar productos en formato cuadrícula
-                        let colIndex = 0;
-                        let rowStartY = yPosition;
-                        
-                        for (let i = 0; i < productsInCategory.length; i++) {
-                            const product = productsInCategory[i];
-                            
-                            // Calcular posición X,Y para la celda actual
-                            const x = margin + (colIndex * (itemWidth + 1));
-                            let y = rowStartY;
-                            
-                            // Verificar si necesitamos una nueva página
-                            if (y + itemHeight > pageHeight - 10) {
-                                doc.addPage();
-                                y = 15; // Asignamos a la variable local 'y', no modificamos rowStartY aquí
-                                rowStartY = 15; // Ahora actualizamos rowStartY para las siguientes celdas
-                                colIndex = 0;
-                            }
-                            
-                            // Dibujar fondo de celda con borde suave
-                            doc.setFillColor(248, 248, 248);
-                            doc.setDrawColor(220, 220, 220);
-                            doc.roundedRect(x, y, itemWidth, itemHeight, 1, 1, 'FD');
-                            
-                            // Agregar imagen (centrada)
-                            const imgX = x + (itemWidth - imgSize) / 2;
-                            const imgY = y + 2;
-                            
-                            // Marco para la imagen
-                            doc.setDrawColor(200, 200, 200);
-                            doc.setFillColor(255, 255, 255);
-                            doc.roundedRect(imgX, imgY, imgSize, imgSize, 1, 1, 'FD');
-                            
-                            // MANEJO SEGURO DE IMÁGENES - Usar imagen placeholder por defecto
-                            try {
-                                // Si el producto tiene una URL de imagen, intenta agregarla
-                                if (product.imagen_url) {
-                                    // Verificamos si la URL es CORS-friendly (mismo origen o data URL)
-                                    if (product.imagen_url.startsWith('data:') || 
-                                        product.imagen_url.startsWith(window.location.origin)) {
-                                        doc.addImage(
-                                            product.imagen_url,
-                                            'JPEG',
-                                            imgX,
-                                            imgY,
-                                            imgSize,
-                                            imgSize,
-                                            '',
-                                            'FAST'
-                                        );
-                                    } else {
-                                        // Si no es CORS-friendly, usamos la imagen de marcador de posición
-                                        doc.addImage(
-                                            placeholderImgData,
-                                            'PNG',
-                                            imgX,
-                                            imgY,
-                                            imgSize,
-                                            imgSize,
-                                            '',
-                                            'FAST'
-                                        );
-                                        
-                                        // Dibujar texto de producto en el centro de la imagen
-                                        doc.setFontSize(8);
-                                        doc.setTextColor(100, 100, 100);
-                                        doc.text(product.nombre.substring(0, 10) + '...', 
-                                            imgX + imgSize/2, 
-                                            imgY + imgSize/2, 
-                                            {align: 'center', baseline: 'middle'});
-                                    }
-                                } else {
-                                    // Si no hay URL de imagen, también usamos el marcador de posición
-                                    doc.addImage(
-                                        placeholderImgData,
-                                        'PNG',
-                                        imgX,
-                                        imgY,
-                                        imgSize,
-                                        imgSize,
-                                        '',
-                                        'FAST'
-                                    );
-                                    
-                                    // Dibujar texto de producto en el centro de la imagen
-                                    doc.setFontSize(8);
-                                    doc.setTextColor(100, 100, 100);
-                                    doc.text('Sin imagen', 
-                                        imgX + imgSize/2, 
-                                        imgY + imgSize/2, 
-                                        {align: 'center', baseline: 'middle'});
-                                }
-                            } catch (e) {
-                                console.log(`No se pudo cargar la imagen para: ${product.nombre}`, e);
-                                // En caso de error, también usamos el marcador de posición
-                                try {
-                                    doc.addImage(
-                                        placeholderImgData,
-                                        'PNG',
-                                        imgX,
-                                        imgY,
-                                        imgSize,
-                                        imgSize,
-                                        '',
-                                        'FAST'
-                                    );
-                                } catch (e2) {
-                                    // Si incluso esto falla, simplemente continuamos sin imagen
-                                    console.error("Error crítico al manejar imágenes:", e2);
-                                }
-                            }
-                            
-                            // Fondo para el nombre (mejora legibilidad)
-                            const nameBoxHeight = 12;
-                            doc.setFillColor(240, 240, 240);
-                            doc.roundedRect(x + 1, y + imgSize + 2, itemWidth - 2, nameBoxHeight, 1, 1, 'F');
-                            
-                            // Nombre del producto (centrado)
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(60, 60, 60);
-                            doc.setFontSize(7);
-                            
-                            // Truncar nombre si es muy largo
-                            let nombre = product.nombre;
-                            if (nombre.length > 25) {
-                                nombre = nombre.substring(0, 22) + '...';
-                            }
-                            
-                            // Texto con fondo blanco para mejor legibilidad
-                            doc.text(nombre, x + itemWidth/2, y + imgSize + 8, { 
-                                align: 'center',
-                                maxWidth: itemWidth - 4
-                            });
-                            
-                            // Precio (centrado y más grande)
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(22, 160, 133);
-                            doc.setFontSize(12);
-                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', {maximumFractionDigits: 0})}`;
-                            doc.text(precio, x + itemWidth/2, y + imgSize + 19, { align: 'center' });
-                            
-                            // Avanzar a la siguiente columna o fila
-                            colIndex++;
-                            if (colIndex >= cols) {
-                                colIndex = 0;
-                                rowStartY += itemHeight + 3; // 3mm de espacio entre filas
-                            }
-                        }
-                        
-                        // Actualizar yPosition para la siguiente categoría
-                        yPosition = rowStartY + 10;
-                    }
-                } else {
-                    // FORMATO LISTA DE PRECIOS (sin cambios)
-                    let colorIndex = 0;
-                    
-                    for (const category of sortedCategories) {
-                        const productsInCategory = groupedProducts[category];
-                        
-                        if (!productsInCategory || productsInCategory.length === 0) {
-                            continue;
-                        }
-            
-                        if (yPosition > pageHeight - 30) {
-                            doc.addPage();
-                            yPosition = 15;
-                        }
-            
-                        const categoryColor = categoryColors[colorIndex % categoryColors.length];
-                        colorIndex++;
-                        
-                        doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
-                        doc.roundedRect(margin, yPosition, contentWidth, 10, 3, 3, 'F');
-                        
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(14);
-                        doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
-                        
-                        yPosition += 14;
-            
-                        doc.setDrawColor(200, 200, 200);
-                        doc.setLineWidth(0.3);
-                        doc.line(margin, yPosition - 2, margin + contentWidth, yPosition - 2);
-            
-                        for (const product of productsInCategory) {
-                            if (yPosition > pageHeight - 16) {
-                                doc.addPage();
-                                yPosition = 15;
-                            }
-            
-                            const isEven = productsInCategory.indexOf(product) % 2 === 0;
-                            doc.setFillColor(isEven ? 252 : 248, isEven ? 252 : 248, isEven ? 252 : 248);
-                            doc.roundedRect(margin, yPosition, contentWidth, 15, 1, 1, 'F');
-                            
-                            const imageSize = 12;
-                            doc.setDrawColor(200, 200, 200);
-                            doc.setLineWidth(0.1);
-                            doc.roundedRect(margin + 2, yPosition + 1.5, imageSize, imageSize, 1, 1, 'F');
-                            
-                            if (product.imagen_url) {
-                                try {
-                                    // Solo intentamos cargar la imagen si es del mismo origen o data URL
-                                    if (product.imagen_url.startsWith('data:') || 
-                                        product.imagen_url.startsWith(window.location.origin)) {
-                                        doc.addImage(
-                                            product.imagen_url, 
-                                            'JPEG', 
-                                            margin + 2, 
-                                            yPosition + 1.5, 
-                                            imageSize, 
-                                            imageSize, 
-                                            '', 
-                                            'FAST'
-                                        );
-                                    }
-                                } catch (e) {
-                                    console.log(`No se pudo cargar la imagen para: ${product.nombre}`);
-                                }
-                            }
-                            
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(60, 60, 60);
-                            doc.setFontSize(9);
-                            
-                            const nombreY = yPosition + 7.5;
-                            doc.text(product.nombre, margin + imageSize + 5, nombreY);
-                            
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(22, 160, 133);
-                            doc.setFontSize(11);
-                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', {maximumFractionDigits: 0})}`;
-                            doc.text(precio, pageWidth - margin - 3, nombreY, { align: 'right' });
-                            
-                            yPosition += 16;
-                        }
-                        
-                        yPosition += 5;
-                    }
-                }
-                
-                // 5. Agregar pie de página con numeración
-                const totalPages = doc.internal.getNumberOfPages();
-                
-                for (let i = 1; i <= totalPages; i++) {
-                    doc.setPage(i);
-                    doc.setFontSize(7);
-                    doc.setTextColor(150);
-                    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 3, { align: 'right' });
-                }
-            
-                // 6. Guardar el archivo con nombre según formato
-                const fileName = options.format === 'catalog' 
-                    ? `catalogo-productos-${new Date().toISOString().slice(0,10)}.pdf`
-                    : `lista-de-precios-${new Date().toISOString().slice(0,10)}.pdf`;
-                
-                doc.save(fileName);
-                setPdfLoading(false);
+                try { generatePriceDocument({ products: productos, options }); }
+                catch(error) { alert(error.message); }
+                finally { setPdfLoading(false); }
             };
-        
+
             const handleLogin = React.useCallback(async (email, password) => {
                 setLoading(true); setError(null);
                 try {

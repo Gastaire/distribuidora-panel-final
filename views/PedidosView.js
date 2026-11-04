@@ -15,6 +15,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const [pedidos, setPedidos] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
+    const [estadoFiltro, setEstadoFiltro] = React.useState('');
     const [searchTerm, setSearchTerm] = React.useState('');
     const [showArchived, setShowArchived] = React.useState(false);
     const [confirmAction, setConfirmAction] = React.useState({ action: null, pedido: null });
@@ -180,10 +181,11 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const filteredPedidos = React.useMemo(() => 
         sortedPedidos.filter(p =>
             (showArchived ? p.estado === 'archivado' : p.estado !== 'archivado') &&
+            (!estadoFiltro || p.estado === estadoFiltro) &&
             ((p.nombre_comercio || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
              (p.nombre_vendedor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
              p.id.toString().includes(searchTerm))
-    ), [sortedPedidos, showArchived, searchTerm]);
+    ), [sortedPedidos, showArchived, searchTerm, estadoFiltro]);
 
     const renderActions = (pedido) => (
         <>
@@ -206,7 +208,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex items-center gap-4 shrink-0">
                     <h1 className="text-3xl font-bold text-gray-800">Bandeja de Pedidos</h1>
-                    {user.rol === 'admin' && (
+                    {['admin', 'deposito'].includes(user.rol) && (
                         <button 
                             onClick={generarHojaRuta} 
                             disabled={printingHojaRuta}
@@ -220,7 +222,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                     <div className="flex items-center justify-between sm:justify-end gap-4">
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-600">Archivados</span>
-                            <button onClick={() => setShowArchived(!showArchived)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showArchived ? 'bg-blue-600' : 'bg-gray-200'}`}>
+                            <button onClick={() => { setShowArchived(!showArchived); setEstadoFiltro(''); }} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${showArchived ? 'bg-blue-600' : 'bg-gray-200'}`}>
                                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${showArchived ? 'translate-x-6' : 'translate-x-1'}`}/>
                             </button>
                         </div>
@@ -229,6 +231,14 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 </div>
             </div>
 
+            <div className="operations-summary grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+                {[['pendiente','Por atender'],['en_preparacion','En preparación'],['facturado','Facturados'],['listo_para_entrega','Listos para entregar']].map(([estado,label]) => <button key={estado} aria-pressed={estadoFiltro===estado} onClick={() => { setShowArchived(false); setEstadoFiltro(estadoFiltro===estado?'':estado); }} className="bg-white border rounded-xl p-4 text-left"><span className="text-xs text-gray-500">{label}</span><strong className="block text-3xl mt-2">{pedidos.filter(p=>p.estado===estado).length}</strong></button>)}
+            </div>
+            <div className="workspace-toolbar flex flex-wrap gap-3 items-center mb-5">
+                <label className="text-sm">Estado <select aria-label="Filtrar por estado" value={estadoFiltro} onChange={e=>setEstadoFiltro(e.target.value)} className="border rounded-lg p-2 ml-2"><option value="">Todos</option>{['pendiente','visto','en_preparacion','facturado','listo_para_entrega','entregado','cancelado','archivado'].map(e=><option key={e} value={e}>{e.replace(/_/g,' ')}</option>)}</select></label>
+                <span className="text-sm text-gray-500">{filteredPedidos.length} pedidos encontrados</span>
+                <button disabled={loading} onClick={()=>fetchPedidos()} className="border rounded-lg p-2 text-sm">Actualizar pedidos</button>
+            </div>
             {loading ? <div className="p-6 flex justify-center"><Spinner className="border-blue-500"/></div> : error ? <p className="p-6 text-red-500">{error}</p> : (
                 <>
                     {/* Vista de Tabla para Escritorio */}

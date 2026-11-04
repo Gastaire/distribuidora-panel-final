@@ -5,11 +5,13 @@
  */
 
 const ReportesView = () => {
+    const reportRef = React.useRef(null);
     const token = localStorage.getItem('token');
 
     // --- Estado de fechas y tab activa ---
-    const hoy = new Date().toISOString().slice(0, 10);
-    const inicioSemana = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+    const localDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const hoy = localDate(new Date());
+    const inicioSemana = localDate(new Date(Date.now() - 6 * 86400000));
 
     const [activeTab, setActiveTab] = React.useState('resumen');
     const [startDate, setStartDate] = React.useState(inicioSemana);
@@ -18,6 +20,8 @@ const ReportesView = () => {
     const [orderBy, setOrderBy] = React.useState('cantidad'); // backend sort for productos
     const [filtroCategoria, setFiltroCategoria] = React.useState('');
 
+    const requestVersion = React.useRef(0);
+    const [diario, setDiario] = React.useState(null);
     const [resumen, setResumen] = React.useState(null);
     const [vendedores, setVendedores] = React.useState(null);
     const [entregados, setEntregados] = React.useState(null);
@@ -43,30 +47,44 @@ const ReportesView = () => {
     const fmt = (n) => parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const fmtN = (n) => parseInt(n || 0).toLocaleString('es-AR');
 
+    React.useEffect(() => () => { requestVersion.current++; }, []);
+
     const cargar = async () => {
+        const version = ++requestVersion.current;
+        if (activeTab !== 'inactivos' && (!startDate || !endDate || startDate>endDate)) { setError('Elegí un rango de fechas válido.'); setLoading(false); return; }
         setLoading(true);
         setError(null);
         try {
+            const apply = (setter, data) => { if (version === requestVersion.current) setter(data); };
             const qs = `?startDate=${startDate}&endDate=${endDate}`;
-            if (activeTab === 'resumen')     setResumen(await apiFetch(`/reportes/resumen-ejecutivo${qs}`));
-            if (activeTab === 'diario')      setDiario(await apiFetch(`/reportes/diario-pedidos${qs}`));
-            if (activeTab === 'vendedores')  setVendedores(await apiFetch(`/reportes/pedidos-por-vendedor${qs}`));
-            if (activeTab === 'entregados')  setEntregados(await apiFetch(`/reportes/pedidos-entregados${qs}`));
-            if (activeTab === 'inactivos')   setInactivos(await apiFetch(`/reportes/clientes-inactivos?dias=${diasInactivo}`));
-            if (activeTab === 'productos')   setProductos(await apiFetch(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30${filtroCategoria ? `&categoria=${encodeURIComponent(filtroCategoria)}` : ''}`));
-            if (activeTab === 'faltantes')   setFaltantes(await apiFetch(`/reportes/faltantes-historico${qs}`));
-            if (activeTab === 'categorias')  setCategorias(await apiFetch(`/reportes/categorias-comparativa${qs}`));
+            if (activeTab === 'resumen')     apply(setResumen, await apiFetch(`/reportes/resumen-ejecutivo${qs}`));
+            if (activeTab === 'diario')      apply(setDiario, await apiFetch(`/reportes/diario-pedidos${qs}`));
+            if (activeTab === 'vendedores')  apply(setVendedores, await apiFetch(`/reportes/pedidos-por-vendedor${qs}`));
+            if (activeTab === 'entregados')  apply(setEntregados, await apiFetch(`/reportes/pedidos-entregados${qs}`));
+            if (activeTab === 'inactivos')   apply(setInactivos, await apiFetch(`/reportes/clientes-inactivos?dias=${diasInactivo}`));
+            if (activeTab === 'productos')   apply(setProductos, await apiFetch(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30${filtroCategoria ? `&categoria=${encodeURIComponent(filtroCategoria)}` : ''}`));
+            if (activeTab === 'faltantes')   apply(setFaltantes, await apiFetch(`/reportes/faltantes-historico${qs}`));
+            if (activeTab === 'categorias')  apply(setCategorias, await apiFetch(`/reportes/categorias-comparativa${qs}`));
         } catch (e) {
-            setError(e.message);
+            if (version === requestVersion.current) setError(e.message);
         } finally {
-            setLoading(false);
+            if (version === requestVersion.current) setLoading(false);
         }
     };
 
-    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria, diasInactivo]);
+    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria, diasInactivo, startDate, endDate, orderBy]);
+
+    const exportarTablas = () => {
+        const rows = Array.from(reportRef.current.querySelectorAll('table')).flatMap(table => [...Array.from(table.rows).map(row=>Array.from(row.cells).map(cell=>cell.innerText.trim())), []]);
+        if (!rows.length) { alert('No hay tablas para exportar en esta vista.'); return; }
+        const quote = value => '"' + (/^[=+@-]/.test(value) ? "'" + value : value).replace(/"/g,'""') + '"';
+        const url = URL.createObjectURL(new Blob(['\ufeff'+rows.map(row=>row.map(quote).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8;'}));
+        const a=document.createElement('a');a.href=url;a.download=`reporte-${activeTab}-${startDate}-${endDate}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
 
     const TABS = [
-        { id: 'resumen',    label: '📊 Resumen' },
+        { id: 'resumen', label: 'Resumen ejecutivo' },
+        { id: 'diario', label: 'Operación diaria' },
         { id: 'vendedores', label: '🏆 Vendedores' },
         { id: 'entregados', label: '✅ Entregados' },
         { id: 'inactivos',  label: '💤 Inactivos' },
@@ -297,7 +315,7 @@ const ReportesView = () => {
             orange: 'from-orange-400 to-orange-600',
         };
         return (
-            <div className={`bg-gradient-to-br ${colors[color]} text-white rounded-xl p-5 shadow`}>
+            <div className={`report-metric bg-white border text-gray-800 rounded-xl p-5 shadow-sm`}>
                 <p className="text-sm font-medium opacity-80">{label}</p>
                 <p className="text-3xl font-bold mt-1">{value}</p>
                 {sub && <p className="text-xs opacity-70 mt-1">{sub}</p>}
@@ -330,7 +348,7 @@ const ReportesView = () => {
                         </select>
                     </div>
                 )}
-                <button onClick={cargar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition">
+                <button disabled={loading} onClick={cargar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition">
                     Consultar
                 </button>
             </div>
@@ -775,10 +793,10 @@ const ReportesView = () => {
 
     return (
         <React.Fragment>
-        <div className="p-4 md:p-6 space-y-4">
+        <div ref={reportRef} className="reports-workspace p-4 md:p-6 space-y-4">
             <div>
                 <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
-                <p className="text-sm text-gray-500">Métricas de gestión y toma de decisiones</p>
+                <p className="text-sm text-gray-500">Ventas, operación y recuperación de clientes en un solo lugar.</p>
             </div>
 
             {/* Tabs */}
@@ -786,7 +804,7 @@ const ReportesView = () => {
                 {TABS.map(t => (
                     <button
                         key={t.id}
-                        onClick={() => setActiveTab(t.id)}
+                        aria-pressed={activeTab === t.id} onClick={() => setActiveTab(t.id)}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
                             activeTab === t.id
                                 ? 'bg-blue-600 text-white shadow'
@@ -798,6 +816,7 @@ const ReportesView = () => {
                 ))}
             </div>
 
+            <div className="workspace-toolbar flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-gray-600">{{resumen:'Evaluá el estado general del negocio.',diario:'Revisá el detalle operativo del período.',vendedores:'Compará el desempeño del equipo comercial.',entregados:'Controlá los pedidos entregados.',inactivos:'Detectá clientes para recuperar y consultá su historial.',productos:'Identificá demanda y oportunidades de reposición.',faltantes:'Priorizá los faltantes que afectan las ventas.',categorias:'Compará la contribución de cada categoría.'}[activeTab]}</p><button disabled={loading || !!error} onClick={exportarTablas} className="border rounded-lg px-3 py-2 text-sm">Descargar tablas CSV</button></div>
             {/* Filtros */}
             <FiltroFechas />
 
