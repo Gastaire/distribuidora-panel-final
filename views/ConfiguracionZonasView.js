@@ -127,31 +127,28 @@ const ConfiguracionZonasView = () => {
         try {
             setError(null);
             
-            // Guardar el día seleccionado
-            const res = await fetch(`${API_URL}/config/cronograma`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify({ fecha: modalEvento.fechaStr, zonas: zonaInput })
-            });
-            if (!res.ok) throw new Error('Error al guardar');
-
-            // Si se seleccionó repetir, aplicar el patrón
+            const fechas = [modalEvento.fechaStr];
             if (repetir !== 'ninguno') {
                 const incremento = repetir === 'semanal' ? 7 : 14;
-                for (let i = 1; i <= parseInt(repetirSemanas); i++) {
-                    const nuevaFecha = new Date(modalEvento.fecha);
-                    nuevaFecha.setDate(nuevaFecha.getDate() + (incremento * i));
-                    const repeatedResponse = await fetch(`${API_URL}/config/cronograma`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                        body: JSON.stringify({ fecha: formatFecha(nuevaFecha), zonas: zonaInput })
-                    });
-                    if (!repeatedResponse.ok) throw new Error(`No se pudo guardar ${formatFecha(nuevaFecha)}. Los días anteriores ya se guardaron; revisá el calendario antes de reintentar.`);
+                for (let i = 1; i <= Number(repetirSemanas); i++) {
+                    const fecha = new Date(modalEvento.fecha);
+                    fecha.setDate(fecha.getDate() + incremento * i);
+                    fechas.push(formatFecha(fecha));
                 }
+            }
+            const enLote = fechas.length > 1;
+            const response = await fetch(`${API_URL}/config/cronograma${enLote ? '/lote' : ''}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(enLote ? { fechas, zonas: zonaInput.trim() } : { fecha: fechas[0], zonas: zonaInput.trim() })
+            });
+            if (!response.ok) {
+                const result = await response.json().catch(() => null);
+                throw new Error(result?.message || 'No se pudo guardar el cronograma.');
             }
 
             setModalEvento(null);
-            setSuccessMsg('Guardado correctamente');
+            setSuccessMsg(fechas.length > 1 ? `${fechas.length} días programados` : 'Día programado');
             setTimeout(() => setSuccessMsg(null), 2500);
             cargarMes();
         } catch (e) {
@@ -202,6 +199,18 @@ const ConfiguracionZonasView = () => {
                 </button>
             </div>
 
+            {!loading && Object.keys(cronograma).some(fecha => cronograma[fecha]) && (
+                <div className="workspace-toolbar mb-4">
+                    <h2 className="font-bold mb-2">Agenda del mes</h2>
+                    <ul className="divide-y">{Object.entries(cronograma).filter(([, zonas]) => zonas).sort(([a], [b]) => a.localeCompare(b)).map(([fecha, zonas]) => (
+                        <li key={fecha} className="py-2 flex gap-3 items-center text-sm">
+                            <time dateTime={fecha} className="font-semibold min-w-[110px]">{new Date(fecha + 'T12:00:00').toLocaleDateString('es-AR', {day:'numeric', month:'short', weekday:'short'})}</time>
+                            <span>{zonas}</span>
+                            {fecha >= formatFecha(new Date()) && <button className="ml-auto text-teal-700" onClick={() => abrirModalDia(new Date(fecha + 'T12:00:00'))}>Editar</button>}
+                        </li>
+                    ))}</ul>
+                </div>
+            )}
             {/* Calendario */}
             <div className="bg-white border rounded-b-xl shadow-sm overflow-hidden">
                 {/* Encabezados de días */}
@@ -262,7 +271,7 @@ const ConfiguracionZonasView = () => {
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">Zona / Localidad</label>
                                 <div className="flex flex-wrap gap-2 mb-2">
-                                    {['Lules', 'San Pablo', 'Bella Vista', 'García Fernández', 'Famaillá', 'La Reducción', 'Ingenio Lules'].map(zona => {
+                                    {DELIVERY_ZONES.map(zona => {
                                         const activa = zonaInput.split(',').map(z => z.trim()).includes(zona);
                                         return (
                                             <button

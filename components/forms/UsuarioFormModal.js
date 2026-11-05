@@ -55,8 +55,8 @@ const UsuarioFormModal = ({ usuario, onClose, onSuccess }) => {
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(body)
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Error al guardar el usuario.');
+            const data = await response.json().catch(() => null);
+            if (!response.ok) throw new Error(data?.message || 'Error al guardar el usuario.');
             onSuccess();
         } catch (err) {
             setError(err.message);
@@ -83,7 +83,7 @@ const UsuarioFormModal = ({ usuario, onClose, onSuccess }) => {
                     </div>
                     <div>
                         <label htmlFor="password" className="block text-sm font-medium text-gray-700">Contraseña</label>
-                        <input type="password" name="password" id="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder={isEditing ? "Dejar en blanco para no cambiar" : ""} />
+                        <input type="password" required={!isEditing} autoComplete="new-password" name="password" id="password" value={formData.password} onChange={handleChange} className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3" placeholder={isEditing ? "Dejar en blanco para no cambiar" : ""} />
                     </div>
                      <div>
                         <label htmlFor="rol" className="block text-sm font-medium text-gray-700">Rol</label>
@@ -95,7 +95,7 @@ const UsuarioFormModal = ({ usuario, onClose, onSuccess }) => {
                     </div>
                 </div>
                 <div className="p-4 border-t bg-gray-50 flex justify-end items-center gap-4">
-                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    {error && <p role="alert" className="text-red-500 text-sm">{error}</p>}
                     <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
                     <button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">{loading ? 'Guardando...' : 'Guardar Usuario'}</button>
                 </div>

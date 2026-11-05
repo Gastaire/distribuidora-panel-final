@@ -34,7 +34,7 @@
         };
         
 
-        const PdfOptionsModal = ({ onClose, onGenerate, loading }) => {
+        const PdfOptionsModal = ({ onClose, onGenerate, loading, error }) => {
             const [options, setOptions] = React.useState({
                 format: 'price-list', // Valores posibles: 'price-list', 'catalog'
                 stock: 'in-stock',
@@ -64,7 +64,7 @@
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-xl font-bold text-gray-800">Generar lista</h2>
-                            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon /></button>
+                            <button type="button" disabled={loading} onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon /></button>
                         </div>
                         <div className="p-6 space-y-6">
                             <div>
@@ -80,7 +80,7 @@
                                     />
                                     <OptionButton 
                                         label="Revista de precios"
-                                        description="Diseño editorial por categorías, productos y precios destacados."
+                                        description="Una sección por categoría, fotos disponibles y precios destacados."
                                         value="catalog"
                                         type="format"
                                         selectedValue={options.format}
@@ -110,8 +110,9 @@
                                 </div>
                             </div>
                         </div>
+                        {error && <p role="alert" className="px-4 pb-2 text-red-700">{error}</p>}
                         <div className="p-4 border-t bg-gray-50 flex justify-end items-center gap-4">
-                            <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                            <button type="button" disabled={loading} onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
                             <button type="button" onClick={handleSubmit} disabled={loading} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
                                 {loading ? <><Spinner className="mr-2"/>Generando...</> : 'Generar lista'}
                             </button>
@@ -464,7 +465,7 @@
                                     {(isAdmin || isDeposito) && !isEditing && (
                                         <div className="bg-gray-50 p-4 rounded-lg mt-4">
                                             <h3 className="font-bold text-gray-800 mb-3">Actualizar Estado</h3>
-                                            <select onChange={(e) => handleUpdateStatus(e.target.value)} value={pedido.estado} className="w-full p-2 border rounded-md">{Object.entries(estadosDisponibles).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select>
+                                            <select onChange={(e) => handleUpdateStatus(e.target.value)} value={pedido.estado} className="w-full p-2 border rounded-md">{!estadosDisponibles[pedido.estado] && <option value={pedido.estado} disabled>{pedido.estado.replace(/_/g, " ")}</option>}{Object.entries(estadosDisponibles).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select>
                                         </div>
                                     )}
                                 </div>
@@ -870,7 +871,7 @@
                     case 'integridad':
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
                     case 'reportes':
-                        return <ReportesView />;
+                        return <ReportesView onSelectPedido={onShowPedido} />;
                     case 'zonas':
                         return <ConfiguracionZonasView />;
                     case 'dashboard': 
@@ -977,6 +978,7 @@
             const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
             const [isImportVentasModalOpen, setIsImportVentasModalOpen] = React.useState(false);
             const [isPdfModalOpen, setIsPdfModalOpen] = React.useState(false);
+            const [pdfError, setPdfError] = React.useState('');
             const [pdfLoading, setPdfLoading] = React.useState(false);
             
             // --- NUEVOS ESTADOS PARA GESTIÓN DE CATEGORÍAS ---
@@ -1018,10 +1020,8 @@
             // --- FIN DE LA MODIFICACIÓN ---
 
             React.useEffect(() => {
-                if (token) {
-                    fetchProductos();
-                }
-            }, [token, fetchProductos]);
+                if (token && currentPage === 'categorias') fetchProductos();
+            }, [token, currentPage, fetchProductos]);
 
             const handleSaveRename = async (oldName, newName) => {
                 setCategoryActionLoading(true);
@@ -1065,10 +1065,15 @@
                 }
             };
 
-            const generatePdf = (options) => {
+            const generatePdf = async (options) => {
                 setPdfLoading(true);
-                try { generatePriceDocument({ products: productos, options }); }
-                catch(error) { alert(error.message); }
+                setPdfError('');
+                try {
+                    await generatePriceDocument({ products: productos, options });
+                    setIsPdfModalOpen(false);
+                } catch(error) {
+                    setPdfError(error.message);
+                }
                 finally { setPdfLoading(false); }
             };
 
@@ -1142,7 +1147,7 @@
                         fetchProductos={fetchProductos}
                         onShowRenameModal={setRenamingCategory}
                         onShowManageModal={setManagingCategory}
-                        onShowPdfOptionsModal={() => setIsPdfModalOpen(true)}
+                        onShowPdfOptionsModal={() => { setPdfError(''); setIsPdfModalOpen(true); }}
                     />
                     {viewingPedidoId && (
                         <PedidoDetailModal
@@ -1207,10 +1212,8 @@
                     {isPdfModalOpen && (
                         <PdfOptionsModal
                             onClose={() => setIsPdfModalOpen(false)}
-                            onGenerate={(options) => {
-                                setIsPdfModalOpen(false);
-                                generatePdf(options);
-                            }}
+                            onGenerate={generatePdf}
+                            error={pdfError}
                             loading={pdfLoading}
                         />
                     )}

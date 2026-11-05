@@ -65,3 +65,17 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .report-metric { border-top:3px solid var(--accent); }
 .report-metric .opacity-80, .report-metric .opacity-70 { opacity:1; color:#647782; }
 @media(max-width:767px) { .workspace-toolbar { align-items:stretch; } .operations-summary strong { font-size:24px; } }
+.report-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 245px), 1fr));
+    gap: 16px;
+    padding: 16px;
+    background: #eff6f4;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+}
+.report-nav-label { color: #46615c; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.report-nav-button { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 13px; }
+.report-nav-button[aria-pressed="true"] { background: #167a70; color: white; border-color: #167a70; }
+.reports-workspace table thead { background: #eff6f4; }
+.reports-workspace table tbody tr:nth-child(even) { background: #fafcfb; }

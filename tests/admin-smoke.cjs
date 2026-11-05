@@ -2,8 +2,22 @@ const {chromium}=require('playwright');
 const fs=require('fs'), path=require('path');
 const babel=require('@babel/standalone');
 const assert=require('node:assert/strict');
-const root=path.resolve(__dirname, '..');
+const built = process.env.QA_BUILD === '1';
+const root=path.resolve(__dirname, '..', built ? 'dist' : '.');
 const stats={totalRevenue:'125000',totalOrders:'10',unidadesVendidas:'12.5',topProducts:[{nombre:'Producto de prueba',totalQuantity:'12.5',totalRevenue:'125000'}],topFaltantes:[{nombre:'Producto faltante',totalFaltante:'2',vecesRemovido:'1'}],lostRevenue:'2000',lostUnits:'2',activeCustomers:'4',totalCustomers:'20',pedidos_pendientes:3,facturados_12h:2,evolucion_semanal:[{dia:new Date().toISOString().slice(0,10),ingresos:'10000'}],anio_anterior_semanal:[]};
+const period = { desde: '2026-11-01', hasta: '2026-11-05', dias: 5 };
+const orderRow = { id: 1, estado: 'entregado', fecha_creacion: new Date().toISOString(), nombre_comercio: 'Cliente de prueba' };
+const stateRow = { estado: 'entregado', total_pedidos: '3', monto_total: '4800', clientes_unicos: '2' };
+const reports = {
+ 'resumen-ejecutivo': { periodo: period, kpis: { total_pedidos: 3, ingresos_totales: 4800 }, por_estado: [stateRow], por_dia: [{ fecha: period.hasta, ingresos: 4800 }] },
+ 'diario-pedidos': { periodo: period, resumen: stateRow, por_estado: [stateRow] },
+ 'pedidos-entregados': { resumen: stateRow, pedidos: [orderRow] },
+ 'pedidos-por-vendedor': { vendedores: [{ vendedor_id: 1, vendedor: 'Equipo QA', monto_total: '4800' }] },
+ 'clientes-inactivos': { total: 1, dias_sin_pedido: 30, clientes: [{ id: 1, nombre_comercio: 'Comercio inactivo', telefono: '3811234567' }] },
+ 'productos-mas-pedidos': { total_productos: 1, order_by: 'cantidad', productos: [{ producto_id: 1, nombre_producto: 'Producto QA', unidades_vendidas: '3.5' }] },
+ 'faltantes-historico': { resumen_por_producto: [{ nombre_producto: 'Faltante QA', total_faltante: '2' }], registros: [] },
+ 'categorias-comparativa': { categorias: [{ categoria: 'Almacén', pct_del_total: '100' }], monto_global: 4800, total_categorias: 1 }
+};
 (async()=>{
 const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || '/usr/bin/google-chrome',headless:true,args:['--no-sandbox']});
 const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));let fail=false;let calls=[];
@@ -12,13 +26,17 @@ await page.route('**/*',async route=>{
  if(url.hostname==='panel.test'){
   if(url.pathname==='/'){let html=fs.readFileSync(path.join(root,'index.html'),'utf8').replace(/<script src="https:\/\/unpkg.com\/@babel[^>]*><\/script>/,'').replaceAll('type="text/babel"','type="text/javascript"').replace('ReactDOM.render(<App />,', 'ReactDOM.render(React.createElement(App),');return route.fulfill({body:html,contentType:'text/html'});}
   const file=path.join(root,url.pathname);if(!fs.existsSync(file))return route.fulfill({status:404,body:'Missing'});
-  const body=fs.readFileSync(file,'utf8');return route.fulfill({body:file.endsWith('.js')?babel.transform(body,{presets:[['react',{runtime:'classic'}]]}).code:body,contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'application/json'});
+  const body=fs.readFileSync(file,'utf8');return route.fulfill({body:file.endsWith('.js') && !built ?babel.transform(body,{presets:[['react',{runtime:'classic'}]]}).code:body,contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'application/json'});
  }
  if(url.pathname.startsWith('/api/')){
  calls.push({path:url.pathname,search:url.search,method:route.request().method(),body:route.request().postData()});
  if (url.pathname.includes('/config/cronograma') && route.request().method()==='PUT')return route.fulfill({status:500,json:{message:'Fallo simulado de guardado'}});
- if(url.pathname.includes('/reportes/'))return route.fulfill({status:500,json:{message:'Reporte no disponible'}});
+ if(url.pathname.includes('/reportes/')) {
+  const report = reports[url.pathname.split('/').pop()];
+  return route.fulfill({status:report ? 200 : 500,json:report || {message:'Reporte no disponible'}});
+ }
  let body=url.pathname.endsWith('/productos') ? {productos:[],categorias:[]} : [];if(url.pathname.includes('/dashboard/stats'))body=fail?{message:'Error de prueba'}:stats;
+ else if(url.pathname.endsWith('/pedidos'))body=[orderRow, {...orderRow,id:2,estado:'pendiente'}, {...orderRow,id:3,estado:'pendiente',fecha_creacion:new Date(Date.now()-14*86400000).toISOString()}];
  else if(url.pathname.endsWith('/auth/profile')||url.pathname.endsWith('/auth/me'))body={id:1,nombre:'Admin de prueba',rol:'admin'};
  return route.fulfill({status:fail&&url.pathname.includes('/dashboard/stats')?500:200,json:body});
  }
@@ -81,7 +99,11 @@ await page.getByRole('navigation').getByRole('button',{name:'Resumen',exact:true
 if (process.env.QA_DOCUMENTS === '1') {
  for(const format of ['price-list','catalog']){
   const download=page.waitForEvent('download');
-  await page.evaluate(format=>generatePriceDocument({products:Array.from({length:30},(_,i)=>({id:i,nombre:`Producto de prueba ${i} con descripción comercial extendida`,codigo_sku:`SKU-${i}`,categoria:i<16?'Almacén':'Bebidas y especialidades',precio_unitario:1234.56+i,stock:'Sí'})),options:{format,stock:'in-stock'}}),format);
+  await page.evaluate(format=>{
+   const canvas=document.createElement('canvas');canvas.width=100;canvas.height=75;
+   const ctx=canvas.getContext('2d');ctx.fillStyle='#008378';ctx.fillRect(15,10,70,55);
+   return generatePriceDocument({products:Array.from({length:30},(_,i)=>({id:i,nombre:`Producto de prueba ${i} con descripción comercial extendida`,codigo_sku:`SKU-${i}`,categoria:i<16?'Almacén':'Bebidas y especialidades',precio_unitario:1234.56+i,stock:'Sí',imagen_url:i===0?canvas.toDataURL():null})),options:{format,stock:'in-stock'}});
+  },format);
   await (await download).saveAs(`/tmp/qa-${format}.pdf`);
  }
 }
@@ -95,7 +117,20 @@ assert.equal(await page.getByRole('dialog').count(),1,'Failed zone save keeps ed
 await page.keyboard.press('Escape');
 await page.getByRole('navigation').getByRole('button',{name:'Reportes',exact:true}).click();
 await page.getByRole('button',{name:'Operación diaria',exact:true}).click();
-await page.getByText('Error al cargar /reportes/diario-pedidos',{exact:false}).waitFor();
+await page.getByText('Volumen por estado',{exact:true}).waitFor();
+for (const [tab, content] of [
+ ['Vendedores', 'Rendimiento por vendedor'], ['Entregas', 'Cliente de prueba'], ['Recuperar clientes', 'Comercio inactivo'],
+ ['Demanda', 'Mayor demanda por unidades'], ['Faltantes', 'Faltante QA'], ['Categorías', 'Participación por categoría']
+]) {
+ await page.getByRole('navigation',{name:'Secciones de reportes'}).getByRole('button',{name:tab,exact:true}).click();
+ await page.getByText(content,{exact:true}).first().waitFor();
+}
+await page.getByRole('navigation',{name:'Navegación principal'}).getByRole('button',{name:'Pedidos',exact:true}).click();
+const pendingCard = page.getByRole('button',{name:/Por atender/});
+await page.waitForFunction(() => [...document.querySelectorAll('.operations-summary strong')].some(el => el.textContent === '1'));
+assert.match(await pendingCard.innerText(), /1/);
+await page.getByLabel('Pedidos creados en').selectOption('30');
+assert.match(await pendingCard.innerText(), /2/);
 assert.ok(calls.some(c=>c.path.endsWith('/reportes/diario-pedidos')));
 await page.getByRole('navigation').getByRole('button',{name:'Resumen',exact:true}).click();await dashboardReady();
 await page.screenshot({path:process.env.QA_SCREENSHOT || '/tmp/distrimaxi-panel-desktop.png',fullPage:true,animations:'disabled'});

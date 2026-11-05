@@ -15,6 +15,8 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const [pedidos, setPedidos] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
+    const [periodo, setPeriodo] = React.useState('7');
+    const [pagina, setPagina] = React.useState(0);
     const [estadoFiltro, setEstadoFiltro] = React.useState('');
     const [searchTerm, setSearchTerm] = React.useState('');
     const [showArchived, setShowArchived] = React.useState(false);
@@ -106,7 +108,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
     const HojaRutaPrintable = ({ data }) => {
         if (!data || data.length === 0) return null;
         const fechaHoy = new Date().toLocaleDateString('es-AR');
-        const localidades = [...new Set(data.map(p => p.localidad).filter(Boolean))].join(', ');
+        const localidades = [...new Set(data.map(p => p.zona_operativa || p.localidad).filter(Boolean))].join(', ');
 
         return (
             <div id="printableHojaRuta" className="printable-area hidden font-sans bg-white" style={{ fontSize: '9pt', color: '#444' }}>
@@ -140,6 +142,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                                     <tr>
                                         <td className="border-b border-gray-200 px-1 py-0.5 text-left">
                                             <span>{pedido.nombre_comercio}</span>
+                                            {pedido.zona_operativa && <div style={{fontSize:"7pt"}}>{pedido.zona_operativa}</div>}
                                             <span style={{ fontSize: '7pt', color: '#888', marginLeft: '4px' }}>#{pedido.id}</span>
                                             {(pedido.horario_atencion || pedido.horario_recepcion) && (
                                                 <div style={{ fontSize: '7pt', color: '#888' }}>
@@ -178,14 +181,28 @@ const PedidosView = ({ onSelectPedido, user }) => {
         );
     };
 
+    const inicioPeriodo = new Date();
+    inicioPeriodo.setHours(0, 0, 0, 0);
+    inicioPeriodo.setDate(inicioPeriodo.getDate() - Number(periodo || 30) + 1);
+    const pedidosDelPeriodo = pedidos.filter(p => new Date(p.fecha_creacion) >= inicioPeriodo);
+    const conteoEstados = pedidosDelPeriodo.reduce((counts, pedido) => {
+        counts[pedido.estado] = (counts[pedido.estado] || 0) + 1;
+        return counts;
+    }, {});
     const filteredPedidos = React.useMemo(() => 
         sortedPedidos.filter(p =>
+            (!periodo || new Date(p.fecha_creacion) >= inicioPeriodo) &&
             (showArchived ? p.estado === 'archivado' : p.estado !== 'archivado') &&
             (!estadoFiltro || p.estado === estadoFiltro) &&
             ((p.nombre_comercio || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
              (p.nombre_vendedor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
              p.id.toString().includes(searchTerm))
-    ), [sortedPedidos, showArchived, searchTerm, estadoFiltro]);
+    ), [sortedPedidos, showArchived, searchTerm, estadoFiltro, periodo, inicioPeriodo.getTime()]);
+
+    React.useEffect(() => setPagina(0), [periodo, estadoFiltro, showArchived, searchTerm]);
+    const ultimaPagina = Math.max(0, Math.ceil(filteredPedidos.length / 50) - 1);
+    const paginaActual = Math.min(pagina, ultimaPagina);
+    const pedidosVisibles = filteredPedidos.slice(paginaActual * 50, (paginaActual + 1) * 50);
 
     const renderActions = (pedido) => (
         <>
@@ -231,11 +248,19 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 </div>
             </div>
 
+            <div className="flex flex-wrap items-center gap-3 mb-3">
+                <label className="text-sm">Pedidos creados en
+                    <select className="ml-2 border rounded-lg p-2" value={periodo} onChange={e => setPeriodo(e.target.value)}>
+                        <option value="7">Últimos 7 días</option><option value="30">Últimos 30 días</option><option value="">Todo el historial</option>
+                    </select>
+                </label>
+                {!periodo && <span className="text-sm text-gray-500">Tarjetas: últimos 30 días</span>}
+            </div>
             <div className="operations-summary grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-                {[['pendiente','Por atender'],['en_preparacion','En preparación'],['facturado','Facturados'],['listo_para_entrega','Listos para entregar']].map(([estado,label]) => <button key={estado} aria-pressed={estadoFiltro===estado} onClick={() => { setShowArchived(false); setEstadoFiltro(estadoFiltro===estado?'':estado); }} className="bg-white border rounded-xl p-4 text-left"><span className="text-xs text-gray-500">{label}</span><strong className="block text-3xl mt-2">{pedidos.filter(p=>p.estado===estado).length}</strong></button>)}
+                {[['pendiente','Por atender'],['en_preparacion','En preparación'],['facturado','Facturados'],['listo_para_entrega','Listos para entregar']].map(([estado,label]) => <button key={estado} aria-pressed={estadoFiltro===estado} onClick={() => { setShowArchived(false); if (!periodo) setPeriodo('30'); setEstadoFiltro(estadoFiltro===estado?'':estado); }} className="bg-white border rounded-xl p-4 text-left"><span className="text-xs text-gray-500">{label}</span><strong className="block text-3xl mt-2">{conteoEstados[estado] || 0}</strong></button>)}
             </div>
             <div className="workspace-toolbar flex flex-wrap gap-3 items-center mb-5">
-                <label className="text-sm">Estado <select aria-label="Filtrar por estado" value={estadoFiltro} onChange={e=>setEstadoFiltro(e.target.value)} className="border rounded-lg p-2 ml-2"><option value="">Todos</option>{['pendiente','visto','en_preparacion','facturado','listo_para_entrega','entregado','cancelado','archivado'].map(e=><option key={e} value={e}>{e.replace(/_/g,' ')}</option>)}</select></label>
+                <label className="text-sm">Estado <select aria-label="Filtrar por estado" value={estadoFiltro} onChange={e=>setEstadoFiltro(e.target.value)} className="border rounded-lg p-2 ml-2"><option value="">Todos</option>{['pendiente','programado','visto','en_preparacion','facturado','listo_para_entrega','entregado','cancelado','archivado'].map(e=><option key={e} value={e}>{e.replace(/_/g,' ')}</option>)}</select></label>
                 <span className="text-sm text-gray-500">{filteredPedidos.length} pedidos encontrados</span>
                 <button disabled={loading} onClick={()=>fetchPedidos()} className="border rounded-lg p-2 text-sm">Actualizar pedidos</button>
             </div>
@@ -256,7 +281,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
-                                    {filteredPedidos.map((pedido) => (
+                                    {pedidosVisibles.map((pedido) => (
                                         <tr key={pedido.id} className="hover:bg-gray-50">
                                             <td className="px-6 py-4 text-sm font-medium text-gray-900">#{pedido.id}</td>
                                             <td className="px-6 py-4 text-sm text-gray-700">{pedido.nombre_comercio}</td>
@@ -273,7 +298,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
 
                     {/* Vista de Tarjetas para Móvil */}
                     <div className="md:hidden space-y-4">
-                        {filteredPedidos.map((pedido) => (
+                        {pedidosVisibles.map((pedido) => (
                             <div key={pedido.id} className="bg-white rounded-xl shadow-lg p-4">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
@@ -294,6 +319,11 @@ const PedidosView = ({ onSelectPedido, user }) => {
                     </div>
                 </>
             )}
+            {!loading && !error && ultimaPagina > 0 && <div className="flex items-center justify-center gap-4 mt-4">
+                <button className="border rounded-lg px-3 py-2" disabled={paginaActual === 0} onClick={() => setPagina(paginaActual - 1)}>Anterior</button>
+                <span className="text-sm">Página {paginaActual + 1} de {ultimaPagina + 1}</span>
+                <button className="border rounded-lg px-3 py-2" disabled={paginaActual === ultimaPagina} onClick={() => setPagina(paginaActual + 1)}>Siguiente</button>
+            </div>}
             {!loading && filteredPedidos.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
             <HojaRutaPrintable data={hojaRutaData} />
         </div>
