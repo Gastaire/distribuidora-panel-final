@@ -51,7 +51,15 @@ const StockBadge = ({ producto }) => {
 };
 // --- FIN DE LA MODIFICACIÓN ---
 
-const TableHeader = ({ children, sortKey, sortConfig, onSort }) => (<th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer" onClick={() => onSort(sortKey)}>{children}{sortConfig.key === sortKey ? <SortIcon direction={sortConfig.direction} /> : <SortIcon />}</th>);
+const TableHeader = ({ children, sortKey, sortConfig, onSort, className = '' }) => {
+    const active = sortConfig?.key === sortKey;
+    return <th scope="col" aria-sort={active ? sortConfig.direction : 'none'} className={`px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase ${className}`}>
+        <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 text-inherit uppercase">
+            {children}<SortIcon direction={active ? sortConfig.direction : undefined} />
+        </button>
+    </th>;
+};
+
 
 const StatCard = ({ title, value, icon, color }) => {
     const colors = {

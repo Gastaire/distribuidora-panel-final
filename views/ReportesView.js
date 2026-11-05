@@ -25,6 +25,8 @@ const ReportesView = ({ onSelectPedido }) => {
 
     const requestVersion = React.useRef(0);
     const [diario, setDiario] = React.useState(null);
+    const [interanual, setInteranual] = React.useState(null);
+    const [segmentoClientes, setSegmentoClientes] = React.useState('todos');
     const [resumen, setResumen] = React.useState(null);
     const [vendedores, setVendedores] = React.useState(null);
     const [entregados, setEntregados] = React.useState(null);
@@ -43,7 +45,10 @@ const ReportesView = ({ onSelectPedido }) => {
 
     const apiFetch = async (path, signal) => {
         const res = await fetch(`${API_URL}${path}`, { signal, headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) throw new Error(`Error al cargar ${path}`);
+        if (!res.ok) {
+            const error = await res.json().catch(() => null);
+            throw new Error(error?.message || `Error al cargar ${path}`);
+        }
         return res.json();
     };
 
@@ -65,6 +70,7 @@ const ReportesView = ({ onSelectPedido }) => {
             const apply = (setter, data) => { if (version === requestVersion.current) setter(data); };
             const qs = `?startDate=${startDate}&endDate=${endDate}`;
             if (activeTab === 'resumen')     apply(setResumen, await request(`/reportes/resumen-ejecutivo${qs}`));
+            if (activeTab === 'interanual')  apply(setInteranual, await request(`/reportes/interanual${qs}`));
             if (activeTab === 'diario')      apply(setDiario, await request(`/reportes/diario-pedidos${qs}`));
             if (activeTab === 'vendedores')  apply(setVendedores, await request(`/reportes/pedidos-por-vendedor${qs}`));
             if (activeTab === 'entregados')  apply(setEntregados, await request(`/reportes/pedidos-entregados${qs}`));
@@ -92,6 +98,7 @@ const ReportesView = ({ onSelectPedido }) => {
     const reportGroups = [
         { title: 'Operación', tabs: [
             ['resumen', 'Resumen ejecutivo', 'Medí el volumen de pedidos y las tasas de entrega y cancelación.'],
+            ['interanual', 'Interanual', 'Compará el mismo rango del año anterior y revisá las mayores variaciones.'],
             ['diario', 'Operación diaria', 'Revisá el volumen y la composición de los pedidos del período.'],
             ['entregados', 'Entregas', 'Buscá un pedido entregado y abrí el detalle para revisar sus datos.']
         ] },
@@ -355,16 +362,8 @@ const ReportesView = ({ onSelectPedido }) => {
         if (activeTab === 'inactivos') return null; // Inactivos usa solo Días y se maneja internamente en la tab
         return (
             <div className="flex flex-wrap items-end gap-3 bg-white border rounded-xl p-4 mb-6 shadow-sm">
-                <div>
-                    <label className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
-                </div>
-                <div>
-                    <label className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-                        className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36" />
-                </div>
+                <DateFieldAR id="reportes-desde" label="Desde" value={startDate} onChange={setStartDate} />
+                <DateFieldAR id="reportes-hasta" label="Hasta" value={endDate} onChange={setEndDate} />
                 {activeTab === 'productos' && (
                     <div>
                         <label className="text-xs font-semibold text-gray-500 block mb-1">Ordenar por</label>
@@ -541,11 +540,34 @@ const ReportesView = ({ onSelectPedido }) => {
         );
     };
 
+    const clientesInactivos = React.useMemo(() => (inactivos?.clientes || []).map(cliente => ({
+        ...cliente,
+        dias_sin_pedido: cliente.ultimo_pedido
+            ? Math.max(0, Math.floor((new Date(hoy) - new Date(String(cliente.ultimo_pedido).slice(0, 10))) / 86400000)) : null
+    })), [inactivos, hoy]);
+    const { items: inactivosOrdenados, requestSort: ordenarInactivos, sortConfig: ordenInactivos } =
+        useSortableData(clientesInactivos, { key: 'total_pedidos_historicos', direction: 'descending' });
+
     const TabInactivos = () => {
         if (!inactivos) return null;
-        const { items: sorted, requestSort, sortConfig } = useSortableData(inactivos.clientes, { key: 'ultimo_pedido', direction: 'ascending' });
+        const conHistorial = clientesInactivos.filter(cliente => Number(cliente.total_pedidos_historicos) > 0).length;
+        const segmento = inactivosOrdenados.filter(cliente => segmentoClientes === 'todos' ||
+            (segmentoClientes === 'recuperar') === (Number(cliente.total_pedidos_historicos) > 0));
+        const visibles = filterRows(segmento);
+        const requestSort = ordenarInactivos;
+        const sortConfig = ordenInactivos;
         return (
             <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <Card label="Clientes para recuperar" value={fmtN(conHistorial)} sub="Registraron al menos un pedido" />
+                    <Card label="Clientes para activar" value={fmtN(clientesInactivos.length - conHistorial)} sub="Sin pedidos registrados" />
+                </div>
+                <div className="flex flex-wrap gap-2 items-center">
+                    {[['todos','Todos'], ['recuperar','Con historial'], ['activar','Sin pedidos']].map(([id, label]) =>
+                        <button key={id} aria-pressed={segmentoClientes === id} onClick={() => setSegmentoClientes(id)} className="report-nav-button">{label}</button>
+                    )}
+                    <span className="text-sm text-gray-500">{visibles.length} clientes</span>
+                </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
                     <div className="flex items-center gap-3">
                         <span className="text-2xl">💤</span>
@@ -572,11 +594,12 @@ const ReportesView = ({ onSelectPedido }) => {
                                     <TableHeader sortKey="telefono" sortConfig={sortConfig} onSort={requestSort}>Teléfono</TableHeader>
                                     <TableHeader sortKey="total_pedidos_historicos" sortConfig={sortConfig} onSort={requestSort} className="text-right">Pedidos hist.</TableHeader>
                                     <TableHeader sortKey="ultimo_pedido" sortConfig={sortConfig} onSort={requestSort}>Último pedido</TableHeader>
+                                    <TableHeader sortKey="dias_sin_pedido" sortConfig={sortConfig} onSort={requestSort}>Días sin pedido</TableHeader>
                                     <th className="px-4 py-2 text-center">Análisis</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {filterRows(sorted).map(c => (
+                                {visibles.map(c => (
                                     <tr key={c.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2 font-semibold">{c.nombre_comercio}</td>
                                         <td className="px-4 py-2 text-gray-600">{c.nombre_contacto || '—'}</td>
@@ -584,9 +607,10 @@ const ReportesView = ({ onSelectPedido }) => {
                                         <td className="px-4 py-2 text-right">{fmtN(c.total_pedidos_historicos)}</td>
                                         <td className="px-4 py-2 text-sm">
                                             {c.ultimo_pedido
-                                                ? <span className="text-orange-600 font-medium">{new Date(c.ultimo_pedido).toLocaleDateString('es-AR')}</span>
+                                                ? <span className="text-orange-600 font-medium">{formatDateAR(c.ultimo_pedido)}</span>
                                                 : <span className="text-red-500 font-medium">Sin pedidos</span>}
                                         </td>
+                                        <td className="px-4 py-2 tabular-nums">{c.dias_sin_pedido ?? '—'}</td>
                                         <td className="px-4 py-2 text-center">
                                             <button
                                                 onClick={() => abrirAnalisis(c.id)}
@@ -599,6 +623,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                 ))}
                             </tbody>
                         </table>
+                        {!visibles.length && <p className="p-5 text-sm text-gray-500">No hay clientes para estos filtros.</p>}
                     </div>
                 </div>
             </div>
@@ -633,7 +658,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                 <TableHeader sortKey="unidades_vendidas" sortConfig={sortConfig} onSort={requestSort} className="text-right">Unidades</TableHeader>
                                 <TableHeader sortKey="aparece_en_pedidos" sortConfig={sortConfig} onSort={requestSort} className="text-right">En pedidos</TableHeader>
                                 <TableHeader sortKey="precio_promedio" sortConfig={sortConfig} onSort={requestSort} className="text-right">Precio prom.</TableHeader>
-                                <TableHeader sortKey="monto_total" sortConfig={sortConfig} onSort={requestSort} className="text-right">Monto total</TableHeader>
+                                <TableHeader sortKey="monto_total" sortConfig={sortConfig} onSort={requestSort} className="text-right">Valor de pedidos</TableHeader>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -646,7 +671,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                     <td className="px-4 py-2 text-right font-bold">{fmtN(p.unidades_vendidas)}</td>
                                     <td className="px-4 py-2 text-right">{fmtN(p.aparece_en_pedidos)}</td>
                                     <td className="px-4 py-2 text-right">${fmt(p.precio_promedio)}</td>
-                                    <td className="px-4 py-2 text-right font-bold text-green-700">${fmt(p.monto_total)}</td>
+                                    <td className="px-4 py-2 text-right metric-positive">${fmt(p.monto_total)}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -665,6 +690,7 @@ const ReportesView = ({ onSelectPedido }) => {
 
         return (
             <div className="space-y-6">
+                <p className="workspace-toolbar text-sm text-gray-600">Impacto estimado al precio actual de catálogo. Si no hay un precio disponible, el importe queda sin estimar.</p>
                 <ReportBars title="Faltantes para priorizar" rows={faltantes.resumen_por_producto} labelKey="nombre_producto" valueKey="total_faltante" />
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="px-5 py-3 border-b bg-gray-50">
@@ -676,6 +702,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                 <TableHeader sortKey="nombre_producto" sortConfig={sortConfigResumen} onSort={requestSortResumen}>Producto</TableHeader>
                                 <TableHeader sortKey="total_faltante" sortConfig={sortConfigResumen} onSort={requestSortResumen} className="text-right">Total removido</TableHeader>
                                 <TableHeader sortKey="veces_removido" sortConfig={sortConfigResumen} onSort={requestSortResumen} className="text-right">Veces removido</TableHeader>
+                                <TableHeader sortKey="monto_estimado" sortConfig={sortConfigResumen} onSort={requestSortResumen}>Impacto estimado</TableHeader>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
@@ -684,6 +711,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                     <td className="px-4 py-2 font-semibold">{f.nombre_producto}</td>
                                     <td className="px-4 py-2 text-right font-bold text-red-600">{fmtN(f.total_faltante)}</td>
                                     <td className="px-4 py-2 text-right">{fmtN(f.veces_removido)}</td>
+                                    <td className="px-4 py-2 text-right metric-negative">{f.monto_estimado == null ? '—' : `$${fmt(f.monto_estimado)}`}{Number(f.registros_sin_precio) > 0 && <small className="block text-gray-600">{f.registros_sin_precio} sin precio</small>}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -703,6 +731,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                     <TableHeader sortKey="pedido_id" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Pedido</TableHeader>
                                     <TableHeader sortKey="nombre_producto" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Producto</TableHeader>
                                     <TableHeader sortKey="cantidad_original" sortConfig={sortConfigRegistros} onSort={requestSortRegistros} className="text-right">Cant. original</TableHeader>
+                                    <TableHeader sortKey="monto_estimado" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Impacto estimado</TableHeader>
                                     <TableHeader sortKey="modificado_por" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Modificado por</TableHeader>
                                     <TableHeader sortKey="fecha_registro" sortConfig={sortConfigRegistros} onSort={requestSortRegistros}>Fecha</TableHeader>
                                 </tr>
@@ -713,6 +742,7 @@ const ReportesView = ({ onSelectPedido }) => {
                                         <td className="px-4 py-2"><button onClick={() => onSelectPedido(r.pedido_id)} className="font-bold text-teal-700">#{r.pedido_id}</button></td>
                                         <td className="px-4 py-2">{r.nombre_producto}</td>
                                         <td className="px-4 py-2 text-right">{r.cantidad_original}</td>
+                                        <td className="px-4 py-2 text-right metric-negative">{r.monto_estimado == null ? '—' : `$${fmt(r.monto_estimado)}`}</td>
                                         <td className="px-4 py-2 text-gray-600">{r.modificado_por}</td>
                                         <td className="px-4 py-2 text-xs text-gray-500">{new Date(r.fecha_registro).toLocaleString('es-AR')}</td>
                                     </tr>
@@ -723,6 +753,74 @@ const ReportesView = ({ onSelectPedido }) => {
                 </div>
             </div>
         );
+    };
+
+    const PeriodValueChart = ({ data, from, to }) => {
+        const start = Date.parse(from);
+        const end = Date.parse(to);
+        if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null;
+        const day = 86400000;
+        const span = Math.round((end - start) / day) + 1;
+        const step = span <= 31 ? 1 : span <= 93 ? 7 : Math.ceil(span / 24);
+        const values = Array.from({ length: Math.ceil(span / step) }, () => 0);
+        for (const row of data) {
+            const index = Math.floor((Date.parse(String(row.fecha).slice(0,10)) - start) / day / step);
+            if (index >= 0 && index < values.length) values[index] += Number(row.ingresos) || 0;
+        }
+        const max = Math.max(1, ...values);
+        const label = index => formatDateAR(new Date(start + index * step * day).toISOString());
+        return <section className="workspace-toolbar">
+            <h3 className="font-bold">Valor de pedidos del período completo</h3>
+            <p className="text-sm text-gray-500 mt-1">{formatDateAR(from)} al {formatDateAR(to)} · {step === 1 ? 'Cada barra representa un día' : `Cada barra agrupa hasta ${step} días`}</p>
+            <div className="period-bars mt-4" aria-label="Evolución del valor de pedidos">
+                {values.map((value, index) => <div key={index} className="period-bar-slot" title={`${label(index)} · $${fmt(value)}`}>
+                    <div className="period-bar-column"><div className="period-bar-fill" style={{height: `${Math.max(1, value / max * 100)}%`}} /></div>
+                    <span className="period-bar-date">{label(index).slice(0,5)}</span>
+                </div>)}
+            </div>
+            <details className="mt-3 text-sm"><summary className="cursor-pointer text-teal-700">Ver importes por tramo</summary>
+                <table className="w-full mt-2"><thead><tr><th scope="col">Desde</th><th scope="col">Hasta</th><th scope="col">Valor</th></tr></thead>
+                    <tbody>{values.map((value, index) => <tr key={index}><td>{label(index)}</td><td>{formatDateAR(new Date(Math.min(end, start + ((index + 1) * step - 1) * day)).toISOString())}</td><td>${fmt(value)}</td></tr>)}</tbody>
+                </table>
+            </details>
+        </section>;
+    };
+
+    const TabInteranual = () => {
+        if (!interanual) return null;
+        const total = interanual.filas.find(row => row.tipo === 'total');
+        const delta = value => `${Number(value) > 0 ? '+' : ''}${fmt(value)}`;
+        const rate = row => Number(row.monto_anterior) === 0 ? 'Sin base' : `${delta(Number(row.variacion) * 100 / Number(row.monto_anterior))}%`;
+        return <div className="space-y-4">
+            <div className="workspace-toolbar">
+                <p className="text-sm">Actual <strong>{formatDateAR(interanual.desde)} al {formatDateAR(interanual.hasta)}</strong></p>
+                <p className="text-sm mt-1">Anterior <strong>{formatDateAR(interanual.desde_anterior)} al {formatDateAR(interanual.hasta_anterior)}</strong></p>
+                <p className="text-xs text-gray-500 mt-2">Montos en pesos nominales, sin ajuste por inflación. Categorías según el catálogo actual. Ranking de hasta 30 cambios por diferencia de monto.</p>
+            </div>
+            {total ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <Card label="Valor actual" value={`$${fmt(total.monto_actual)}`} sub={`Anterior $${fmt(total.monto_anterior)}`} />
+                <Card label="Variación de valor" value={rate(total)} sub={`$${delta(total.variacion)}`} />
+                <Card label="Pedidos" value={fmtN(total.pedidos_actual)} sub={`Anterior ${fmtN(total.pedidos_anterior)}`} />
+                <Card label="Clientes con pedidos" value={fmtN(total.clientes_actual)} sub={`Anterior ${fmtN(total.clientes_anterior)}`} />
+            </div> : <p className="workspace-toolbar text-gray-500">Sin pedidos en ambos períodos.</p>}
+            {[['productos','Productos'], ['clientes','Clientes'], ['categorias','Categorías']].map(([tipo, label]) => {
+                const rows = filterRows(interanual.filas.filter(row => row.tipo === tipo));
+                return <section key={tipo} className="bg-white border rounded-xl overflow-x-auto">
+                    <h3 className="p-4 font-bold">{label} · mayores cambios</h3>
+                    {rows.length ? <table className="min-w-full text-sm">
+                        <thead><tr>{['Nombre','Valor anterior','Valor actual','Diferencia','Variación','Unidades anteriores','Unidades actuales','Pedidos anteriores','Pedidos actuales'].map(header => <th key={header} className="px-3 py-2 text-left">{header}</th>)}</tr></thead>
+                        <tbody>{rows.map(row => <tr key={row.clave}>
+                            <td className="px-3 py-2 font-semibold">{row.nombre}</td>
+                            <td className="px-3 py-2">${fmt(row.monto_anterior)}</td><td className="px-3 py-2 metric-blue">${fmt(row.monto_actual)}</td>
+                            <td className={`px-3 py-2 ${Number(row.variacion) < 0 ? 'metric-negative' : Number(row.variacion) > 0 ? 'metric-positive' : ''}`}>${delta(row.variacion)}</td>
+                            <td className="px-3 py-2">{rate(row)}</td>
+                            <td className="px-3 py-2">{fmtN(row.unidades_anterior)}</td><td className="px-3 py-2">{fmtN(row.unidades_actual)}</td>
+                            <td className="px-3 py-2">{fmtN(row.pedidos_anterior)}</td><td className="px-3 py-2">{fmtN(row.pedidos_actual)}</td>
+                        </tr>)}</tbody>
+                    </table> : <p className="px-4 pb-4 text-sm text-gray-500">Sin datos para esta selección.</p>}
+                </section>;
+            })}
+        </div>;
     };
 
     // ─── Tab Resumen Ejecutivo ────────────────────────────────────────────────
@@ -742,7 +840,7 @@ const ReportesView = ({ onSelectPedido }) => {
         };
         return (
             <div className="space-y-6">
-                <ReportBars title="Valor de pedidos por día · últimas 7 fechas con actividad" rows={(resumen.por_dia || []).slice(-7).map(row => ({ ...row, dia: String(row.fecha).slice(0,10) }))} labelKey="dia" valueKey="ingresos" format={value => `$${fmt(value)}`} />
+                <PeriodValueChart data={resumen.por_dia || []} from={resumen.periodo.desde} to={resumen.periodo.hasta} />
                 <div className="bg-gray-50 border rounded-xl p-3 text-sm text-gray-500">
                     Período: <strong>{new Date(resumen.periodo.desde+'T00:00:00').toLocaleDateString('es-AR')}</strong> al <strong>{new Date(resumen.periodo.hasta+'T00:00:00').toLocaleDateString('es-AR')}</strong> — {resumen.periodo.dias} días
                 </div>
@@ -832,6 +930,7 @@ const ReportesView = ({ onSelectPedido }) => {
 
     const tabContent = {
         resumen:    <TabResumen />,
+        interanual: <TabInteranual />,
         diario:     <TabDiario />,
         vendedores: <TabVendedores />,
         entregados: <TabEntregados />,
@@ -873,7 +972,7 @@ const ReportesView = ({ onSelectPedido }) => {
                     ))}
                 </div>
             </section>
-            <FiltroFechas />
+            {FiltroFechas()}
 
             {/* Contenido */}
             {loading && (

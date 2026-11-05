@@ -144,11 +144,8 @@ const PedidosView = ({ onSelectPedido, user }) => {
                                             <span>{pedido.nombre_comercio}</span>
                                             {pedido.zona_operativa && <div style={{fontSize:"7pt"}}>{pedido.zona_operativa}</div>}
                                             <span style={{ fontSize: '7pt', color: '#888', marginLeft: '4px' }}>#{pedido.id}</span>
-                                            {(pedido.horario_atencion || pedido.horario_recepcion) && (
-                                                <div style={{ fontSize: '7pt', color: '#888' }}>
-                                                    {pedido.horario_recepcion ? 'Recep: ' + pedido.horario_recepcion : pedido.horario_atencion ? 'Aten: ' + pedido.horario_atencion : ''}
-                                                </div>
-                                            )}
+                                            {formatCustomerSchedule(pedido.horario_atencion) && <div style={{fontSize:'7pt'}}>Atención: {formatCustomerSchedule(pedido.horario_atencion)}</div>}
+                                            {formatCustomerSchedule(pedido.horario_entrega || pedido.horario_recepcion) && <div style={{fontSize:'7pt'}}>Recepción: {formatCustomerSchedule(pedido.horario_entrega || pedido.horario_recepcion)}</div>}
                                         </td>
                                         <td className="border-b border-gray-200 px-1 py-0.5"></td>
                                         <td className="border-b border-gray-200 px-1 py-0.5"></td>

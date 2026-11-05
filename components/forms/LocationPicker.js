@@ -15,7 +15,7 @@ const LocationPicker = ({ lat, lng, onChange }) => {
     const centerLng = lng || defaultLng;
 
     React.useEffect(() => {
-        if (!mapRef.current) return;
+        if (!mapRef.current || !window.L) return;
 
         // Initialize Map
         if (!mapInstance.current) {
@@ -44,6 +44,11 @@ const LocationPicker = ({ lat, lng, onChange }) => {
                 }
             });
         }
+        return () => {
+            mapInstance.current?.remove();
+            mapInstance.current = null;
+            markerInstance.current = null;
+        };
     }, []);
 
     // Update marker when props change from outside

@@ -8,19 +8,25 @@ const stats={totalRevenue:'125000',totalOrders:'10',unidadesVendidas:'12.5',topP
 const period = { desde: '2026-11-01', hasta: '2026-11-05', dias: 5 };
 const orderRow = { id: 1, estado: 'entregado', fecha_creacion: new Date().toISOString(), nombre_comercio: 'Cliente de prueba' };
 const stateRow = { estado: 'entregado', total_pedidos: '3', monto_total: '4800', clientes_unicos: '2' };
+const comparison = { clave: 'QA', nombre: 'Producto interanual QA', monto_actual: 300, monto_anterior: 70, variacion: 230, pedidos_actual: 1, pedidos_anterior: 1, unidades_actual: 3, unidades_anterior: 1, clientes_actual: 1, clientes_anterior: 1 };
 const reports = {
+ 'interanual': { desde: period.desde, hasta: period.hasta, desde_anterior: '2025-11-01', hasta_anterior: '2025-11-05',
+  filas: [{...comparison, tipo:'total'}, {...comparison, tipo:'productos'}] },
  'resumen-ejecutivo': { periodo: period, kpis: { total_pedidos: 3, ingresos_totales: 4800 }, por_estado: [stateRow], por_dia: [{ fecha: period.hasta, ingresos: 4800 }] },
  'diario-pedidos': { periodo: period, resumen: stateRow, por_estado: [stateRow] },
  'pedidos-entregados': { resumen: stateRow, pedidos: [orderRow] },
  'pedidos-por-vendedor': { vendedores: [{ vendedor_id: 1, vendedor: 'Equipo QA', monto_total: '4800' }] },
- 'clientes-inactivos': { total: 1, dias_sin_pedido: 30, clientes: [{ id: 1, nombre_comercio: 'Comercio inactivo', telefono: '3811234567' }] },
+ 'clientes-inactivos': { total: 2, dias_sin_pedido: 30, clientes: [
+  {id:1,nombre_comercio:'Comercio inactivo',telefono:'3811234567',total_pedidos_historicos:12,ultimo_pedido:'2026-08-05'},
+  {id:2,nombre_comercio:'Almacén nuevo',total_pedidos_historicos:0,ultimo_pedido:null}
+ ] },
  'productos-mas-pedidos': { total_productos: 1, order_by: 'cantidad', productos: [{ producto_id: 1, nombre_producto: 'Producto QA', unidades_vendidas: '3.5' }] },
- 'faltantes-historico': { resumen_por_producto: [{ nombre_producto: 'Faltante QA', total_faltante: '2' }], registros: [] },
+ 'faltantes-historico': { resumen_por_producto: [{ nombre_producto: 'Faltante QA', total_faltante: '2', monto_estimado: '240.00' }], registros: [] },
  'categorias-comparativa': { categorias: [{ categoria: 'Almacén', pct_del_total: '100' }], monto_global: 4800, total_categorias: 1 }
 };
 (async()=>{
 const browser=await chromium.launch({executablePath:process.env.CHROME_PATH || '/usr/bin/google-chrome',headless:true,args:['--no-sandbox']});
-const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));let fail=false;let calls=[];
+const page=await browser.newPage({locale:"en-US",viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));let fail=false;let calls=[];
 await page.route('**/*',async route=>{
  const url=new URL(route.request().url());
  if(url.hostname==='panel.test'){
@@ -28,6 +34,10 @@ await page.route('**/*',async route=>{
   const file=path.join(root,url.pathname);if(!fs.existsSync(file))return route.fulfill({status:404,body:'Missing'});
   const body=fs.readFileSync(file,'utf8');return route.fulfill({body:file.endsWith('.js') && !built ?babel.transform(body,{presets:[['react',{runtime:'classic'}]]}).code:body,contentType:file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'application/json'});
  }
+ if(url.hostname==='photo.test')return route.fulfill({
+  status:200,contentType:'image/png',headers:{'Access-Control-Allow-Origin':'*'},
+  body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a+1sAAAAASUVORK5CYII=','base64')
+ });
  if(url.pathname.startsWith('/api/')){
  calls.push({path:url.pathname,search:url.search,method:route.request().method(),body:route.request().postData()});
  if (url.pathname.includes('/config/cronograma') && route.request().method()==='PUT')return route.fulfill({status:500,json:{message:'Fallo simulado de guardado'}});
@@ -36,6 +46,11 @@ await page.route('**/*',async route=>{
   return route.fulfill({status:report ? 200 : 500,json:report || {message:'Reporte no disponible'}});
  }
  let body=url.pathname.endsWith('/productos') ? {productos:[{id:51,nombre:'Producto sin foto QA',categoria:'Almacén',precio_unitario:200,stock:'Sí'}],categorias:['Almacén']} : [];if(url.pathname.includes('/dashboard/stats'))body=fail?{message:'Error de prueba'}:stats;
+ else if(url.pathname.endsWith('/clientes') && route.request().method()==='GET')body=[{
+  id:22,nombre_comercio:'Comercio GPS QA', latitud:-26.95,longitud:-65.3,
+  horario_atencion:'{"Lun":[{"desde":"08:00","hasta":"12:00"}]}',
+  horario_recepcion:'Miércoles 14:00 a 17:00'
+ }];
  else if(url.pathname.endsWith('/pedidos'))body=[orderRow, {...orderRow,id:2,estado:'pendiente'}, {...orderRow,id:3,estado:'pendiente',fecha_creacion:new Date(Date.now()-14*86400000).toISOString()}];
  else if(url.pathname.endsWith('/auth/profile')||url.pathname.endsWith('/auth/me'))body={id:1,nombre:'Admin de prueba',rol:'admin'};
  return route.fulfill({status:fail&&url.pathname.includes('/dashboard/stats')?500:200,json:body});
@@ -54,6 +69,10 @@ await page.goto('http://panel.test', { waitUntil:'networkidle' });
 const dashboardReady = () => page.locator('.kpi-card').first().waitFor();
 await dashboardReady();
 assert.equal(await page.locator('.kpi-card').count(),9);
+assert.match(await page.locator('#dashboard-desde').inputValue(), /^\d{2}\/\d{2}\/\d{4}$/);
+await page.getByRole('button',{name:'Calendario · Desde',exact:true}).click();
+await page.getByRole('group',{name:'Elegir fecha · Desde',exact:true}).waitFor();
+await page.keyboard.press('Escape');
 assert.match(await page.locator('.kpi-card').last().innerText(), /2.000/);
 assert.match(await page.locator('.kpi-card').nth(7).innerText(), /12,5/);
 const expectCharts = (count) => page.waitForFunction(count => Object.values(Chart.instances).filter(c => !c.destroyed).length === count, count);
@@ -100,7 +119,11 @@ await page.getByRole('button',{name:'Edición rápida',exact:true}).click();
 await page.getByText('1 de 1',{exact:true}).waitFor();
 await page.keyboard.press('Escape');
 await page.getByRole('button',{name:'Revisar fotos',exact:true}).click();
-await page.getByRole('dialog',{name:'Revisar fotos del catálogo'}).waitFor();
+const photoDialog = page.getByRole('dialog',{name:'Revisar fotos del catálogo'});
+await photoDialog.getByLabel('Enlace de la foto').fill('https://photo.test/sample.png');
+await photoDialog.getByRole('button',{name:'Guardar y seguir'}).click();
+await photoDialog.getByText('Foto guardada como JPEG optimizado.',{exact:true}).waitFor();
+assert.ok(calls.some(call=>call.path.endsWith('/productos/51')&&JSON.parse(call.body).imagen_url.startsWith('data:image/jpeg;base64,')));
 await page.keyboard.press('Escape');
 await page.getByRole('navigation').getByRole('button',{name:'Resumen',exact:true}).click();await dashboardReady();
 // Local document generation uses synthetic catalog data, never production records.
@@ -128,10 +151,17 @@ await page.getByRole('button',{name:'Operación diaria',exact:true}).click();
 await page.getByText('Volumen por estado',{exact:true}).waitFor();
 for (const [tab, content] of [
  ['Vendedores', 'Rendimiento por vendedor'], ['Entregas', 'Cliente de prueba'], ['Recuperar clientes', 'Comercio inactivo'],
- ['Demanda', 'Mayor demanda por unidades'], ['Faltantes', 'Faltante QA'], ['Categorías', 'Participación por categoría']
+ ['Demanda', 'Mayor demanda por unidades'], ['Faltantes', 'Faltante QA'], ['Categorías', 'Participación por categoría'], ['Interanual', 'Producto interanual QA']
 ]) {
  await page.getByRole('navigation',{name:'Secciones de reportes'}).getByRole('button',{name:tab,exact:true}).click();
  await page.getByText(content,{exact:true}).first().waitFor();
+ if (tab === 'Recuperar clientes') {
+  await page.getByRole('button',{name:'Cliente',exact:true}).click();
+  assert.match(await page.locator('main tbody tr').first().innerText(), /Almacén nuevo/);
+  await page.getByRole('button',{name:'Con historial',exact:true}).click();
+  assert.equal(await page.locator('main tbody tr').count(), 1);
+  assert.match(await page.locator('main tbody tr').first().innerText(), /Comercio inactivo/);
+ }
 }
 await page.getByRole('navigation',{name:'Navegación principal'}).getByRole('button',{name:'Pedidos',exact:true}).click();
 const pendingCard = page.getByRole('button',{name:/Por atender/});
@@ -146,6 +176,13 @@ await page.setViewportSize({width:390,height:844});
 assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'No horizontal overflow on mobile');
 await page.getByRole('button',{name:'Abrir navegación'}).click();
 await page.getByRole('navigation').getByRole('button',{name:'Clientes',exact:true}).click();
+await page.getByText('Lun 08:00–12:00',{exact:false}).last().waitFor();
+await page.getByRole('button',{name:'Editar',exact:true}).click();
+const editClient = page.getByRole('dialog',{name:'Cliente',exact:true});
+await editClient.locator('input[name="latitud"][value="-26.95"]').waitFor();
+await editClient.getByText('08:00 - 12:00 hs',{exact:true}).waitFor();
+await editClient.getByText('Registrado como texto: Miércoles 14:00 a 17:00',{exact:true}).waitFor();
+await page.keyboard.press('Escape');
 await page.getByRole('button',{name:'Agregar',exact:true}).click();
 await page.getByRole('dialog',{name:'Cliente',exact:true}).waitFor();
 await page.screenshot({path:'/tmp/distrimaxi-panel-mobile.png',fullPage:true,animations:'disabled'});

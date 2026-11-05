@@ -19,17 +19,7 @@ const HorariosPicker = ({ label, hint, value, onChange }) => {
         { id: 0, label: 'D' },
     ];
 
-    React.useEffect(() => {
-        if (value) {
-            try {
-                setHorarios(JSON.parse(value));
-            } catch (e) {
-                setHorarios([]);
-            }
-        } else {
-            setHorarios([]);
-        }
-    }, [value]);
+    React.useEffect(() => { setHorarios(parseCustomerSchedule(value)); }, [value]);
 
     const toggleDiaNuevo = (diaId) => {
         setNuevoDias(prev => 
@@ -53,22 +43,19 @@ const HorariosPicker = ({ label, hint, value, onChange }) => {
         onChange(newHorarios.length > 0 ? JSON.stringify(newHorarios) : '');
     };
 
-    const formatDias = (diasArr) => {
-        return diasArr.map(d => diasSemana.find(ds => ds.id === d)?.label).join(', ');
-    };
-
     return (
         <div className="bg-gray-50 border border-gray-200 p-3 rounded-lg">
             <label className="block text-sm font-semibold text-gray-700">{label}</label>
             {hint && <p className="text-xs text-gray-500 mb-3">{hint}</p>}
             
+            {horarios.length === 0 && formatCustomerSchedule(value) && <p className="text-sm text-gray-700 mb-3">Registrado como texto: {formatCustomerSchedule(value)}</p>}
             {/* Lista de horarios existentes */}
             {horarios.length > 0 && (
                 <div className="space-y-2 mb-4">
                     {horarios.map((h, i) => (
                         <div key={i} className="flex justify-between items-center bg-white border border-gray-200 p-2 rounded shadow-sm text-sm">
                             <div>
-                                <span className="font-bold text-blue-600">{formatDias(h.dias)}</span>
+                                <span className="font-bold text-blue-600">{formatScheduleDays(h.dias)}</span>
                                 <span className="text-gray-600 ml-2">{h.inicio} - {h.fin} hs</span>
                             </div>
                             <button 

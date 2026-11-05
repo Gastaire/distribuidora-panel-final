@@ -4,6 +4,7 @@ const ProductPhotoQueue = ({ products, categories, onClose, onSaved }) => {
     const [imageUrl, setImageUrl] = React.useState('');
     const [category, setCategory] = React.useState('');
     const [saving, setSaving] = React.useState(false);
+    const [notice, setNotice] = React.useState('');
     const [error, setError] = React.useState('');
     const [failedImage, setFailedImage] = React.useState('');
     const touchStart = React.useRef(null);
@@ -41,7 +42,8 @@ const ProductPhotoQueue = ({ products, categories, onClose, onSaved }) => {
         setSaving(true);
         setError('');
         try {
-            const body = { imagen_url: normalizedUrl };
+            const photo = await optimizeProductPhotoUrl(normalizedUrl);
+            const body = { imagen_url: photo.source };
             if (category !== (product.categoria || '')) body.categoria = category;
             const response = await fetch(`${API_URL}/productos/${product.id}`, {
                 method: 'PUT',
@@ -53,6 +55,7 @@ const ProductPhotoQueue = ({ products, categories, onClose, onSaved }) => {
                 throw new Error(result?.message || 'No se pudo guardar la foto.');
             }
             changeProduct(position + 1);
+            setNotice(photo.optimized ? 'Foto guardada como JPEG optimizado.' : 'El servidor bloqueó la compresión. Se guardó el enlace.');
             onSaved();
         } catch (err) {
             setError(err.message);
@@ -90,6 +93,7 @@ const ProductPhotoQueue = ({ products, categories, onClose, onSaved }) => {
                 {suggestion && !category && <button className="text-sm text-teal-700" onClick={() => setCategory(suggestion)}>Usar categoría sugerida · {suggestion}</button>}
                 {error && <p role="alert" className="text-red-700">{error}</p>}
             </>}
+            {notice && <p role="status" className="text-sm text-teal-700">{notice}</p>}
             <div className="flex flex-wrap gap-2">
                 <button disabled={saving} onClick={onClose} className="border rounded-lg px-3 py-2">Cerrar</button>
                 {product && <>

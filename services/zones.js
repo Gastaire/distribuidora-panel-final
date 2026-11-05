@@ -1,6 +1,6 @@
 const DELIVERY_ZONES = [
     'Lules', 'Ingenio Lules', 'San Pablo', 'Manantial', 'Ingenio Viejo',
-    'La Reducción', 'García Fernández', 'Bella Vista', 'Santa Rosa de Leales', 'Famaillá'
+    'La Reducción', 'García Fernández', 'Bella Vista', 'Santa Rosa de Leales', 'Famaillá', 'Santa Lucía'
 ];
 
 const normalizeDeliveryZone = value => String(value || '').trim().normalize('NFD')

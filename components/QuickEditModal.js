@@ -227,33 +227,10 @@ const QuickEditModal = ({ productos, initialIndex, categorias, onClose, onSaved 
         if (!imageUrl.trim()) return;
         setFetchingUrl(true);
         try {
-            const img = new Image();
-            img.crossOrigin = 'anonymous';
-            const loaded = await new Promise((resolve) => {
-                img.onload  = () => resolve(true);
-                img.onerror = () => resolve(false);
-                img.src = imageUrl.trim();
-            });
-
-            if (loaded) {
-                const MAX_DIM = 600;
-                let { width, height } = img;
-                if (width > MAX_DIM || height > MAX_DIM) {
-                    if (width > height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
-                    else                { width  = Math.round(width  * MAX_DIM / height); height = MAX_DIM; }
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = width; canvas.height = height;
-                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-                const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
-                setPreview(dataUrl);
-                updateChange('imagen_url', dataUrl);
-            } else {
-                // CORS blockó → guardar URL directa (el browser la mostrará normalmente desde <img>)
-                setPreview(imageUrl.trim());
-                updateChange('imagen_url', imageUrl.trim());
-                alert('⚠️ La imagen no se pudo descargar por restricciones del servidor externo (CORS), pero la URL fue guardada igual. Se verá correctamente en la lista de productos.');
-            }
+            const result = await optimizeProductPhotoUrl(imageUrl);
+            setPreview(result.source);
+            updateChange('imagen_url', result.source);
+            if (!result.optimized) alert('El servidor permite mostrar la foto pero bloquea la compresión. Se guardará el enlace.');
         } catch (err) {
             alert('Error al cargar la imagen: ' + err.message);
         } finally {

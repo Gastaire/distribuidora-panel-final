@@ -20,33 +20,14 @@ const useSortableData = (items, config = null, numericSort = false) => {
                 const valA = a[sortConfig.key];
                 const valB = b[sortConfig.key];
                 
-                // --- INICIO DE LA MODIFICACIÓN: Lógica especial para 'categoria' ---
-                if (sortConfig.key === 'categoria') {
-                    const aHasCategory = valA && valA.trim() !== '';
-                    const bHasCategory = valB && valB.trim() !== '';
-
-                    if (!aHasCategory && bHasCategory) return -1; // 'a' (sin categoría) va primero
-                    if (aHasCategory && !bHasCategory) return 1;  // 'b' (sin categoría) va primero
-                    
-                    // Si ambos tienen o no tienen categoría, se aplica el ordenamiento normal de texto.
-                }
-                // --- FIN DE LA MODIFICACIÓN ---
-
-                // --- Lógica de ordenamiento automático (números vs texto) ---
+                const missing = value => value == null || String(value).trim() === '';
+                if (missing(valA) || missing(valB)) return Number(missing(valA)) - Number(missing(valB));
                 const numA = Number(valA);
                 const numB = Number(valB);
-
-                // Si ambos valores se pueden parsear como números válidos (y no son strings vacíos o null)
-                if (valA !== '' && valA !== null && valB !== '' && valB !== null && !isNaN(numA) && !isNaN(numB)) {
-                    if (numA < numB) return sortConfig.direction === 'ascending' ? -1 : 1;
-                    if (numA > numB) return sortConfig.direction === 'ascending' ? 1 : -1;
-                    return 0;
-                }
-
-                // Ordenamiento de texto por defecto
-                if (valA < valB) return sortConfig.direction === 'ascending' ? -1 : 1;
-                if (valA > valB) return sortConfig.direction === 'ascending' ? 1 : -1;
-                return 0;
+                const difference = Number.isFinite(numA) && Number.isFinite(numB)
+                    ? numA - numB
+                    : String(valA).localeCompare(String(valB), 'es-AR', { sensitivity: 'base', numeric: true });
+                return sortConfig.direction === 'ascending' ? difference : -difference;
             });
         }
         return sortableItems;

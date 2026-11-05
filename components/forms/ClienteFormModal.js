@@ -35,7 +35,7 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
                 latitud: cliente.latitud || '',
                 longitud: cliente.longitud || '',
                 horario_atencion: cliente.horario_atencion || '',
-                horario_entrega: cliente.horario_entrega || ''
+                horario_entrega: cliente.horario_entrega || cliente.horario_recepcion || ''
             }); 
         } else {
             setFormData({ 
@@ -69,16 +69,31 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
         }
     };
     const handleSubmit = async (e) => {
-        e.preventDefault(); setLoading(true); setError(null);
+        e.preventDefault();
+        const latitud = String(formData.latitud ?? '').trim().replace(',', '.');
+        const longitud = String(formData.longitud ?? '').trim().replace(',', '.');
+        if ((latitud || longitud) && (!latitud || !longitud || !Number.isFinite(Number(latitud)) || !Number.isFinite(Number(longitud))
+            || Math.abs(Number(latitud)) > 90 || Math.abs(Number(longitud)) > 180)) {
+            setError('Ingresá latitud y longitud válidas, o dejá ambas vacías.');
+            return;
+        }
+        setLoading(true);
+        setError(null);
         const url = isEditing ? `${API_URL}/clientes/${cliente.id}` : `${API_URL}/clientes`;
         const method = isEditing ? 'PUT' : 'POST';
         try {
-            const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(formData) });
+            const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ ...formData, latitud, longitud }) });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Error al guardar el cliente.');
             onSuccess();
         } catch (err) { setError(err.message); } finally { setLoading(false); }
     };
+    const mapCoordinate = (value, limit) => {
+        const text = String(value ?? '').trim().replace(',', '.');
+        const number = Number(text);
+        return text && Number.isFinite(number) && Math.abs(number) <= limit ? number : null;
+    };
+
     return (
         <DialogFrame onClose={onClose} busy={loading} label="Cliente">
             <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
@@ -92,9 +107,13 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
                     </div>
                     <div className="border-t pt-4">
                         <p className="block text-sm font-medium text-gray-700 mb-2">Ubicación GPS</p>
+                        <div className="grid grid-cols-2 gap-3 mb-3">
+                            <label className="text-sm">Latitud <input className="w-full border rounded p-2" inputMode="decimal" name="latitud" value={formData.latitud} onChange={handleChange} /></label>
+                            <label className="text-sm">Longitud <input className="w-full border rounded p-2" inputMode="decimal" name="longitud" value={formData.longitud} onChange={handleChange} /></label>
+                        </div>
                         <LocationPicker 
-                            lat={formData.latitud} 
-                            lng={formData.longitud} 
+                            lat={mapCoordinate(formData.latitud, 90)}
+                            lng={mapCoordinate(formData.longitud, 180)}
                             onChange={(lat, lng) => setFormData(prev => ({ ...prev, latitud: lat, longitud: lng }))}
                         />
                     </div>

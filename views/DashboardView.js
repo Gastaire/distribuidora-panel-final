@@ -314,26 +314,8 @@ const DashboardView = ({ onShowImportVentasModal, onNavigate }) => {
 
             {/* ── Filtros de fecha ─────────────────────────────────────────────── */}
             <div className="flex flex-wrap items-end gap-3 bg-white border border-gray-100 rounded-xl p-4 shadow-sm">
-                <div>
-                    <label htmlFor="dashboard-desde" className="text-xs font-semibold text-gray-500 block mb-1">Desde</label>
-                    <input
-                        id="dashboard-desde" type="date"
-                        max={endDate || undefined}
-                        value={startDate}
-                        onChange={e => setStartDate(e.target.value)}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36 bg-gray-50"
-                    />
-                </div>
-                <div>
-                    <label htmlFor="dashboard-hasta" className="text-xs font-semibold text-gray-500 block mb-1">Hasta</label>
-                    <input
-                        id="dashboard-hasta" type="date"
-                        min={startDate || undefined}
-                        value={endDate}
-                        onChange={e => setEndDate(e.target.value)}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 w-36 bg-gray-50"
-                    />
-                </div>
+                <DateFieldAR id="dashboard-desde" label="Desde" value={startDate} onChange={setStartDate} />
+                <DateFieldAR id="dashboard-hasta" label="Hasta" value={endDate} onChange={setEndDate} />
                 <div className="flex flex-wrap gap-2" aria-label="Períodos rápidos">
                     {[1, 7, 30].map(days => <button type="button" key={days} onClick={() => selectPeriod(days)} className="period-button text-sm px-3 py-2 border rounded-lg">{days === 1 ? 'Hoy' : `Últimos ${days} días`}</button>)}
                 </div>

@@ -79,3 +79,20 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .report-nav-button[aria-pressed="true"] { background: #167a70; color: white; border-color: #167a70; }
 .reports-workspace table thead { background: #eff6f4; }
 .reports-workspace table tbody tr:nth-child(even) { background: #fafcfb; }
+/* Financial values use color consistently across the panel. */
+.metric-blue, .dashboard-view .kpi-card > p:first-of-type { color: #164881; font-variant-numeric: tabular-nums; font-weight: 700; }
+.metric-positive { color: #087358; font-variant-numeric: tabular-nums; font-weight: 700; }
+.metric-negative, .dashboard-view .kpi-card.text-red-600 > p:first-of-type { color: #a53149; font-variant-numeric: tabular-nums; font-weight: 700; }
+.dashboard-view .kpi-card.text-green-600 > p:first-of-type { color: #087358; }
+.dashboard-view .kpi-card.text-amber-600 > p:first-of-type { color: #855719; }
+.client-table th, .client-table td { vertical-align: top; }
+.client-logistics { display: grid; gap: 5px; min-width: 200px; line-height: 1.5; }
+.client-logistics strong { color: #174881; margin-right: 4px; }
+.period-bars { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 8px; }
+.period-bar-slot { flex: 1 0 34px; text-align: center; min-width: 0; }
+.period-bar-column { display: flex; height: 124px; flex-direction: column; justify-content: end; background: #f0f5fa; border-radius: 3px; }
+.period-bar-fill { background: #265f9a; border-radius: 3px 3px 0 0; }
+.period-bar-date { color: #536780; font-size: 10px; font-variant-numeric: tabular-nums; }
+@media (max-width: 479px) {
+    .date-field-calendar { position: fixed; inset: auto 12px 20px; width: auto; max-width: 340px; margin-inline: auto; }
+}

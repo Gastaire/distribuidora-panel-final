@@ -68,6 +68,18 @@ const ClientesView = ({ user, onShowClienteForm }) => {
     };
     const filteredClientes = sortedClientes.filter(c => !zoneFilter || (zoneFilter === "pendiente" ? !c.zona_manual : canonicalDeliveryZone(c.zona) === zoneFilter)).filter(c => c.nombre_comercio.toLowerCase().includes(searchTerm.toLowerCase()) || (c.nombre_contacto && c.nombre_contacto.toLowerCase().includes(searchTerm.toLowerCase())));
     const isAdmin = user.rol === 'admin';
+    const renderLogistica = cliente => {
+        const atencion = formatCustomerSchedule(cliente.horario_atencion);
+        const recepcion = formatCustomerSchedule(cliente.horario_entrega || cliente.horario_recepcion);
+        const hasGps = cliente.latitud != null && cliente.longitud != null && cliente.latitud !== '' && cliente.longitud !== '';
+        return <div className="client-logistics">
+            {cliente.direccion && <p className="font-medium">{cliente.direccion}</p>}
+            {atencion && <p><strong>Atención</strong> {atencion}</p>}
+            {recepcion && <p><strong>Recepción</strong> {recepcion}</p>}
+            {hasGps ? <p><strong>GPS</strong> <span className="tabular-nums">{cliente.latitud}, {cliente.longitud}</span></p>
+                : <p className="text-gray-500">GPS pendiente</p>}
+        </div>;
+    };
     return (
         <div>
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -102,14 +114,14 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                     {loading && <div className="p-6 flex justify-center"><Spinner className="border-blue-500"/></div>}
                     {error && <p className="p-6 text-red-500">{error}</p>}
                     {!loading && !error && (
-                        <table className="min-w-full divide-y divide-gray-200">
+                        <table className="min-w-[960px] w-full divide-y divide-gray-200 client-table">
                             <thead className="bg-gray-50"><tr>
                                 <TableHeader sortKey="nombre_comercio" sortConfig={sortConfig} onSort={requestSort}>Comercio</TableHeader>
                                 <TableHeader sortKey="nombre_contacto" sortConfig={sortConfig} onSort={requestSort}>Contacto</TableHeader>
                                 <th className="px-6 py-3 text-left">Zona operativa</th>
                                 <TableHeader sortKey="telefono" sortConfig={sortConfig} onSort={requestSort}>Teléfono</TableHeader>
                                 <TableHeader sortKey="vendedor_nombre" sortConfig={sortConfig} onSort={requestSort}>Vendedor</TableHeader>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detalles / Horarios</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dirección, horarios y GPS</th>
                                 {isAdmin && <th className="relative px-6 py-3"><span className="sr-only">Acciones</span></th>}
                             </tr></thead>
                             <tbody className="bg-white divide-y divide-gray-200">
@@ -120,10 +132,7 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                                         <td className="px-6 py-4 text-sm">{isAdmin ? <button className="text-teal-700 font-semibold" onClick={() => openZone(cliente)}>{cliente.zona || 'Asignar zona'}{cliente.zona_manual ? '' : ' · revisar'}</button> : (cliente.zona || '—')}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{cliente.telefono}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{cliente.vendedor_nombre || 'Sin asignar'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={cliente.direccion}>
-                                            {cliente.direccion || '—'}
-                                            {cliente.horario_atencion && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">Horarios</span>}
-                                        </td>
+                                        <td className="px-6 py-4 text-sm">{renderLogistica(cliente)}</td>
                                         {isAdmin && <td className="px-6 py-4 text-right text-sm font-medium space-x-4"><a href="#" onClick={(e) => { e.preventDefault(); onShowClienteForm(cliente); }} className="text-blue-600 hover:text-blue-900">Editar</a><a href="#" onClick={(e) => { e.preventDefault(); handleDelete(cliente.id); }} className="text-red-600 hover:text-red-900">Eliminar</a></td>}
                                     </tr>
                                 ))}
@@ -157,10 +166,9 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                                 📞 {cliente.telefono}
                             </a>
                         )}
-                        <div className="mt-2 text-xs text-gray-500 space-y-1">
-                            {cliente.vendedor_nombre && <p><span className="font-medium">Vendedor:</span> {cliente.vendedor_nombre}</p>}
-                            {cliente.direccion && <p><span className="font-medium">Detalles:</span> {cliente.direccion}</p>}
-                            {cliente.horario_atencion && <p className="text-blue-600 font-medium mt-1">🕒 Horarios Configurados</p>}
+                        <div className="mt-2 text-xs text-gray-600 space-y-1">
+                            {cliente.vendedor_nombre && <p><strong>Vendedor</strong> {cliente.vendedor_nombre}</p>}
+                            {renderLogistica(cliente)}
                         </div>
                         {isAdmin && <button className="text-sm text-teal-700" onClick={() => openZone(cliente)}>{cliente.zona || "Asignar zona"}</button>}
                     </div>
