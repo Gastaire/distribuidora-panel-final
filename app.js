@@ -34,7 +34,7 @@
         };
         
 
-        const PdfOptionsModal = ({ onClose, onGenerate, loading }) => {
+        const PdfOptionsModal = ({ onClose, onGenerate, loading, error }) => {
             const [options, setOptions] = React.useState({
                 format: 'price-list', // Valores posibles: 'price-list', 'catalog'
                 stock: 'in-stock',
@@ -60,18 +60,18 @@
             );
         
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                <DialogFrame onClose={onClose} busy={loading} label="Generar lista">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl">
                         <div className="flex justify-between items-center p-4 border-b">
-                            <h2 className="text-xl font-bold text-gray-800">Exportar a PDF</h2>
-                            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon /></button>
+                            <h2 className="text-xl font-bold text-gray-800">Generar lista</h2>
+                            <button type="button" disabled={loading} onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon /></button>
                         </div>
                         <div className="p-6 space-y-6">
                             <div>
                                 <h3 className="text-lg font-semibold text-gray-700 mb-2">1. Elige el formato</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <OptionButton 
-                                        label="Lista de Precios"
+                                        label="Lista de precios"
                                         description="Un listado compacto, organizado por categorías. Ideal para imprimir."
                                         value="price-list"
                                         type="format"
@@ -79,8 +79,8 @@
                                         onSelect={handleOptionChange}
                                     />
                                     <OptionButton 
-                                        label="Catálogo con Fotos"
-                                        description="Muestra los productos en cuadrícula con imágenes destacadas."
+                                        label="Revista de precios"
+                                        description="Una sección por categoría, fotos disponibles y precios destacados."
                                         value="catalog"
                                         type="format"
                                         selectedValue={options.format}
@@ -110,20 +110,21 @@
                                 </div>
                             </div>
                         </div>
+                        {error && <p role="alert" className="px-4 pb-2 text-red-700">{error}</p>}
                         <div className="p-4 border-t bg-gray-50 flex justify-end items-center gap-4">
-                            <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                            <button type="button" disabled={loading} onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
                             <button type="button" onClick={handleSubmit} disabled={loading} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg flex items-center">
-                                {loading ? <><Spinner className="mr-2"/>Generando...</> : 'Generar PDF'}
+                                {loading ? <><Spinner className="mr-2"/>Generando...</> : 'Generar lista'}
                             </button>
                         </div>
                     </div>
-                </div>
+                </DialogFrame>
             );
         };
 
         const LogsModal = ({ logs, pedidoId, onClose }) => {
             return (
-                <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex justify-center items-center p-4">
+                <DialogFrame onClose={onClose} busy={false} label="Historial del pedido" layer={60}>
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-xl font-bold text-gray-800">Historial del Pedido #{pedidoId}</h2>
@@ -150,7 +151,7 @@
                             <button type="button" onClick={onClose} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-lg">Cerrar</button>
                         </div>
                     </div>
-                </div>
+                </DialogFrame>
             );
         };
 
@@ -354,7 +355,7 @@
             return (
                 <React.Fragment>
                     {showLogs && <LogsModal logs={logs} pedidoId={pedidoId} onClose={() => setShowLogs(false)} />}
-                    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                    <DialogFrame onClose={onClose} busy={loading || guardandoNotas} label="Detalle del pedido">
                         <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border-b gap-3">
                                 <h2 className="text-xl font-bold text-gray-800">Detalle del Pedido #{pedidoId}</h2>
@@ -464,13 +465,13 @@
                                     {(isAdmin || isDeposito) && !isEditing && (
                                         <div className="bg-gray-50 p-4 rounded-lg mt-4">
                                             <h3 className="font-bold text-gray-800 mb-3">Actualizar Estado</h3>
-                                            <select onChange={(e) => handleUpdateStatus(e.target.value)} value={pedido.estado} className="w-full p-2 border rounded-md">{Object.entries(estadosDisponibles).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select>
+                                            <select onChange={(e) => handleUpdateStatus(e.target.value)} value={pedido.estado} className="w-full p-2 border rounded-md">{!estadosDisponibles[pedido.estado] && <option value={pedido.estado} disabled>{pedido.estado.replace(/_/g, " ")}</option>}{Object.entries(estadosDisponibles).map(([key, value]) => <option key={key} value={key}>{value}</option>)}</select>
                                         </div>
                                     )}
                                 </div>
                             )}
                         </div>
-                    </div>
+                    </DialogFrame>
                     {pedido && (
                         <React.Fragment>
                             <PrintableView pedido={pedido} total={totalPedido} notasParaImprimir={notasEditables} />
@@ -710,7 +711,7 @@
             };
 
             return (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                 <DialogFrame onClose={onClose} busy={loading} label="Importar productos">
                     <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b"><h2 className="text-xl font-bold text-gray-800">Importar Productos desde CSV</h2><button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><CloseIcon/></button></div>
                         <div className="p-6 overflow-y-auto space-y-4">
@@ -745,7 +746,7 @@
                             </button>
                         </div>
                     </form>
-                </div>
+                </DialogFrame>
             );
         };
 
@@ -795,7 +796,7 @@
             };
 
             return (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                 <DialogFrame onClose={onClose} busy={loading} label="Importar ventas presenciales">
                     <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                         <div className="flex justify-between items-center p-4 border-b">
                             <h2 className="text-xl font-bold text-gray-800">Importar Ventas Presenciales (CSV)</h2>
@@ -820,7 +821,7 @@
                             </button>
                         </div>
                     </form>
-                </div>
+                </DialogFrame>
             );
         };
 
@@ -871,17 +872,17 @@
                     case 'integridad':
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
                     case 'reportes':
-                        return <ReportesView />;
+                        return <ReportesView onSelectPedido={onShowPedido} />;
                     case 'zonas':
                         return <ConfiguracionZonasView />;
                     case 'dashboard': 
                     default:
-                        return <DashboardView onShowImportVentasModal={onShowImportVentasModal} />;
+                        return <DashboardView onShowImportVentasModal={onShowImportVentasModal} onNavigate={handleNavItemClick} />;
                 }
             };
 
             return (
-                <div className="flex h-screen bg-gray-100 font-sans">
+                <div className="admin-shell flex h-screen bg-gray-100 font-sans">
                     {/* Overlay para cerrar el menú en móvil */}
                     {isSidebarOpen && (
                         <div 
@@ -894,10 +895,11 @@
                     <aside className={`fixed inset-y-0 left-0 bg-gray-800 text-white flex flex-col shrink-0 w-64 z-30 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                         <div className="h-20 flex items-center justify-center border-b border-gray-700">
                             <PackageIcon className="h-8 w-8 mr-2" />
-                            <span className="text-xl font-bold">Distribuidora</span>
+                            <div><span className="text-xl font-bold">DistriMaxi</span><p className="brand-caption">ADMINISTRACIÓN</p></div>
                         </div>
-                        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-                            <NavItem icon={<HomeIcon />} text="Dashboard" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
+                        <nav aria-label="Navegación principal" className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+                            <p className="nav-caption">ESPACIO DE TRABAJO</p>
+                            <NavItem icon={<HomeIcon />} text="Resumen" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
                             <NavItem icon={<ShoppingCartIcon />} text="Pedidos" active={currentPage === 'pedidos'} onClick={() => handleNavItemClick('pedidos')} />
                             {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
@@ -909,6 +911,7 @@
                             {isAdmin && (
                                 <div>
                                     <button
+                                        aria-expanded={isAdminOpen}
                                         onClick={() => setIsAdminOpen(o => !o)}
                                         className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold transition-colors mt-2 ${
                                             ['usuarios','actividad'].includes(currentPage)
@@ -941,16 +944,16 @@
                     
                     <div className="flex-1 flex flex-col overflow-hidden">
                         {/* Barra Superior con Botón de Hamburguesa */}
-                        <header className="md:hidden bg-white shadow-md p-4 flex justify-between items-center">
-                            <button onClick={() => setIsSidebarOpen(true)} className="text-gray-600">
+                        <header className="admin-topbar bg-white p-4 flex justify-between items-center">
+                            <button aria-label="Abrir navegación" onClick={() => setIsSidebarOpen(true)} className="md:hidden text-gray-600">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                             </button>
-                            <h1 className="text-lg font-bold text-gray-800 capitalize">{currentPage}</h1>
-                            <div></div> {/* Espaciador */}
+                            <p className="text-sm text-gray-500">Administración <span className="mx-2 text-gray-300">/</span><span className="font-semibold text-gray-800">{{ dashboard: 'Resumen', pedidos: 'Pedidos', reportes: 'Reportes', productos: 'Productos', categorias: 'Categorías', clientes: 'Clientes', zonas: 'Zonas', usuarios: 'Usuarios', actividad: 'Actividad', integridad: 'Integridad' }[currentPage] || currentPage}</span></p>
+                            <span className="hidden sm:block text-xs text-gray-500">{user.nombre} · <span className="capitalize">{user.rol}</span></span>
                         </header>
                         
                         {/* Contenido Principal */}
-                        <main className="flex-1 p-4 md:p-8 overflow-y-auto">{renderContent()}</main>
+                        <main id="contenido" className="admin-content flex-1 p-4 md:p-8 overflow-y-auto">{renderContent()}</main>
                     </div>
                 </div>
             );
@@ -976,6 +979,7 @@
             const [isImportModalOpen, setIsImportModalOpen] = React.useState(false);
             const [isImportVentasModalOpen, setIsImportVentasModalOpen] = React.useState(false);
             const [isPdfModalOpen, setIsPdfModalOpen] = React.useState(false);
+            const [pdfError, setPdfError] = React.useState('');
             const [pdfLoading, setPdfLoading] = React.useState(false);
             
             // --- NUEVOS ESTADOS PARA GESTIÓN DE CATEGORÍAS ---
@@ -1017,10 +1021,8 @@
             // --- FIN DE LA MODIFICACIÓN ---
 
             React.useEffect(() => {
-                if (token) {
-                    fetchProductos();
-                }
-            }, [token, fetchProductos]);
+                if (token && currentPage === 'categorias') fetchProductos();
+            }, [token, currentPage, fetchProductos]);
 
             const handleSaveRename = async (oldName, newName) => {
                 setCategoryActionLoading(true);
@@ -1064,268 +1066,18 @@
                 }
             };
 
-            const generatePdf = (options) => {
+            const generatePdf = async (options) => {
                 setPdfLoading(true);
-                const { jsPDF } = window.jspdf;
-                if (!jsPDF) {
-                    alert("Error: La librería jsPDF no está cargada.");
-                    setPdfLoading(false);
-                    return;
+                setPdfError('');
+                try {
+                    await generatePriceDocument({ products: productos, options });
+                    setIsPdfModalOpen(false);
+                } catch(error) {
+                    setPdfError(error.message);
                 }
-                
-                // Crear documento PDF en formato A4 (siempre vertical para ambos formatos)
-                const doc = new jsPDF({
-                    orientation: 'portrait',
-                    unit: 'mm',
-                    format: 'a4'
-                });
-                
-                // Constantes para márgenes y dimensiones
-                const pageWidth = doc.internal.pageSize.getWidth();
-                const pageHeight = doc.internal.pageSize.getHeight();
-                const margin = 5; // Margen general reducido para aprovechar más espacio
-                const contentWidth = pageWidth - (margin * 2);
-                
-                // 1. Filtrar productos según las opciones
-                let productosFiltrados = [...productos];
-                if (options.stock === 'in-stock') {
-                    productosFiltrados = productosFiltrados.filter(p => p.stock === 'Sí');
-                }
-            
-                // 2. Agrupar por categoría
-                const groupedProducts = productosFiltrados.reduce((acc, product) => {
-                    const category = product.categoria || 'Sin Categoría';
-                    if (!acc[category]) acc[category] = [];
-                    acc[category].push(product);
-                    return acc;
-                }, {});
-            
-                const sortedCategories = Object.keys(groupedProducts).sort();
-            
-                // 3. Diseño del PDF - Encabezado general
-                // Crear un fondo para el encabezado
-                doc.setFillColor(22, 160, 133); // Color verde corporativo
-                doc.rect(0, 0, pageWidth, 25, 'F');
-                
-                // Título principal
-                doc.setFontSize(22);
-                doc.setFont(undefined, 'bold');
-                doc.setTextColor(255, 255, 255); // Texto blanco sobre fondo verde
-                doc.text("Lista de Precios", pageWidth / 2, 15, { align: 'center' });
-                
-                // Subtítulos
-                doc.setFontSize(9);
-                doc.setFont(undefined, 'normal');
-                doc.setTextColor(240, 240, 240); // Gris claro para los subtítulos
-                doc.text(`Generado por: ${user.nombre}`, margin, 22);
-                doc.text(`Fecha: ${new Date().toLocaleDateString('es-AR')}`, pageWidth - margin, 22, { align: 'right' });
-            
-                let yPosition = 35; // Posición inicial tras el encabezado
-            
-                // Colores para alternar entre categorías
-                const categoryColors = [
-                    [26, 188, 156], // Verde turquesa
-                    [41, 128, 185], // Azul
-                    [142, 68, 173], // Púrpura
-                    [192, 57, 43]   // Rojo
-                ];
-                
-                if (options.format === 'catalog') {
-                    // FORMATO CATÁLOGO (CUADRÍCULA) - 4 columnas, control de página por fila completa
-                    const cols = 4;
-                    const gap = 2; // mm entre celdas
-                    const itemWidth = (contentWidth - (gap * (cols - 1))) / cols;
-                    const imgSize = itemWidth - 4;
-                    const nameBoxH = 11;
-                    const priceBoxH = 9;
-                    const itemHeight = imgSize + nameBoxH + priceBoxH + 4; // total altura celda
-
-                    const placeholderImgData = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAIAAAD/gAIDAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAAyJpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADw/eHBhY2tldCBiZWdpbj0i77u/IiBpZD0iVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkIj8+IDx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IkFkb2JlIFhNUCBDb3JlIDUuMC1jMDYwIDYxLjEzNDc3NywgMjAxMC8wMi8xMi0xNzozMjowMCAgICAgICAgIj4gPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4gPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIgeG1sbnM6eG1wPSJodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvIiB4bWxuczp4bXBNTT0iaHR0cDovL25zLmFkb2JlLmNvbS94YXAvMS4wL21tLyIgeG1sbnM6c3RSZWY9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC9zVHlwZS9SZXNvdXJjZVJlZiMiIHhtcDpDcmVhdG9yVG9vbD0iQWRvYmUgUGhvdG9zaG9wIENTNSBNYWNpbnRvc2giIHhtcE1NOkluc3RhbmNlSUQ9InhtcC5paWQ6OENDRjNBN0E2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiIHhtcE1NOkRvY3VtZW50SUQ9InhtcC5kaWQ6OENDRjNBN0I2NTZBMTFFMEI3QjRBODM4NzJDMjlGNDgiPiA8eG1wTU06RGVyaXZlZEZyb20gc3RSZWY6aW5zdGFuY2VJRD0ieG1wLmlpZDo4Q0NGM0E3ODY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIgc3RSZWY6ZG9jdW1lbnRJRD0ieG1wLmRpZDo4Q0NGM0E3OTY1NkExMUUwQjdCNEE4Mzg3MkMyOUY0OCIvPiA8L3JkZjpEZXNjcmlwdGlvbj4gPC9yZGY6UkRGPiA8L3g6eG1wbWV0YT4gPD94cGFja2V0 eng0ZD0iciI/PqqezsUAAAAfSURBVHjaYmRgYJD6//8/AwMDEwMDAwMDEAMDAAMBAQB+EXF/AAAAABJRU5ErkJggg==';
-
-                    let colorIndex = 0;
-
-                    for (const category of sortedCategories) {
-                        const productsInCategory = groupedProducts[category];
-                        if (!productsInCategory || productsInCategory.length === 0) continue;
-
-                        // Espacio mínimo: header (14mm) + 1 fila completa
-                        if (yPosition > pageHeight - (14 + itemHeight + 10)) {
-                            doc.addPage();
-                            yPosition = 15;
-                        }
-
-                        // Encabezado de categoría
-                        const categoryColor = categoryColors[colorIndex % categoryColors.length];
-                        colorIndex++;
-                        doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
-                        doc.roundedRect(margin, yPosition, contentWidth, 10, 2, 2, 'F');
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(13);
-                        doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
-                        yPosition += 14;
-
-                        // Recorrer productos fila por fila
-                        let colIndex = 0;
-                        let rowY = yPosition;
-
-                        for (let i = 0; i < productsInCategory.length; i++) {
-                            const product = productsInCategory[i];
-
-                            // Al inicio de una nueva fila: verificar si cabe en la página
-                            if (colIndex === 0 && rowY + itemHeight > pageHeight - 10) {
-                                doc.addPage();
-                                rowY = 15;
-                            }
-
-                            const x = margin + colIndex * (itemWidth + gap);
-                            const y = rowY;
-
-                            // Celda de fondo
-                            doc.setFillColor(248, 249, 250);
-                            doc.setDrawColor(220, 220, 220);
-                            doc.setLineWidth(0.2);
-                            doc.roundedRect(x, y, itemWidth, itemHeight, 1.5, 1.5, 'FD');
-
-                            // Marco imagen
-                            const imgX = x + (itemWidth - imgSize) / 2;
-                            const imgY = y + 2;
-                            doc.setFillColor(255, 255, 255);
-                            doc.roundedRect(imgX, imgY, imgSize, imgSize, 1, 1, 'F');
-
-                            // Imagen
-                            try {
-                                if (product.imagen_url && (product.imagen_url.startsWith('data:') || product.imagen_url.startsWith(window.location.origin))) {
-                                    doc.addImage(product.imagen_url, 'JPEG', imgX, imgY, imgSize, imgSize, '', 'FAST');
-                                } else {
-                                    doc.addImage(placeholderImgData, 'PNG', imgX, imgY, imgSize, imgSize, '', 'FAST');
-                                }
-                            } catch (_) {
-                                try { doc.addImage(placeholderImgData, 'PNG', imgX, imgY, imgSize, imgSize, '', 'FAST'); } catch (__) {}
-                            }
-
-                            // Nombre (fondo gris claro)
-                            const nameY = y + imgSize + 2;
-                            doc.setFillColor(238, 240, 243);
-                            doc.roundedRect(x + 1, nameY, itemWidth - 2, nameBoxH, 1, 1, 'F');
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(50, 50, 50);
-                            doc.setFontSize(6.5);
-                            const nombre = product.nombre.length > 26 ? product.nombre.substring(0, 23) + '...' : product.nombre;
-                            doc.text(nombre, x + itemWidth / 2, nameY + nameBoxH / 2, { align: 'center', baseline: 'middle', maxWidth: itemWidth - 4 });
-
-                            // Precio
-                            const priceY = nameY + nameBoxH;
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(22, 160, 133);
-                            doc.setFontSize(11);
-                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-                            doc.text(precio, x + itemWidth / 2, priceY + priceBoxH / 2, { align: 'center', baseline: 'middle' });
-
-                            colIndex++;
-                            if (colIndex >= cols) {
-                                colIndex = 0;
-                                rowY += itemHeight + 3;
-                            }
-                        }
-
-                        // Completar la última fila incompleta
-                        if (colIndex > 0) rowY += itemHeight + 3;
-                        yPosition = rowY + 5;
-                    }
-                } else {
-                    // FORMATO LISTA DE PRECIOS
-                    let colorIndex = 0;
-                    const rowH = 15; // altura de cada fila de producto
-
-                    for (const category of sortedCategories) {
-                        const productsInCategory = groupedProducts[category];
-                        if (!productsInCategory || productsInCategory.length === 0) continue;
-
-                        // Espacio mínimo: encabezado + 1 fila
-                        if (yPosition > pageHeight - (14 + rowH + 5)) {
-                            doc.addPage();
-                            yPosition = 15;
-                        }
-
-                        const categoryColor = categoryColors[colorIndex % categoryColors.length];
-                        colorIndex++;
-                        doc.setFillColor(categoryColor[0], categoryColor[1], categoryColor[2]);
-                        doc.roundedRect(margin, yPosition, contentWidth, 10, 3, 3, 'F');
-                        doc.setFont(undefined, 'bold');
-                        doc.setTextColor(255, 255, 255);
-                        doc.setFontSize(13);
-                        doc.text(category.toUpperCase(), pageWidth / 2, yPosition + 6.5, { align: 'center' });
-                        yPosition += 14;
-
-                        doc.setDrawColor(200, 200, 200);
-                        doc.setLineWidth(0.3);
-                        doc.line(margin, yPosition - 2, margin + contentWidth, yPosition - 2);
-
-                        for (let i = 0; i < productsInCategory.length; i++) {
-                            const product = productsInCategory[i];
-
-                            // Verificar espacio antes de cada fila
-                            if (yPosition + rowH > pageHeight - 10) {
-                                doc.addPage();
-                                yPosition = 15;
-                            }
-
-                            const isEven = i % 2 === 0;
-                            doc.setFillColor(isEven ? 252 : 246, isEven ? 252 : 246, isEven ? 252 : 252);
-                            doc.roundedRect(margin, yPosition, contentWidth, rowH - 1, 1, 1, 'F');
-
-                            // Imagen miniatura
-                            const imgSizeList = 11;
-                            doc.setDrawColor(210, 210, 210);
-                            doc.setLineWidth(0.1);
-                            doc.roundedRect(margin + 2, yPosition + 2, imgSizeList, imgSizeList, 1, 1, 'F');
-                            if (product.imagen_url) {
-                                try {
-                                    if (product.imagen_url.startsWith('data:') || product.imagen_url.startsWith(window.location.origin)) {
-                                        doc.addImage(product.imagen_url, 'JPEG', margin + 2, yPosition + 2, imgSizeList, imgSizeList, '', 'FAST');
-                                    }
-                                } catch (_) {}
-                            }
-
-                            // Nombre
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(55, 55, 55);
-                            doc.setFontSize(9);
-                            doc.text(product.nombre, margin + imgSizeList + 5, yPosition + rowH / 2, { baseline: 'middle' });
-
-                            // Precio
-                            doc.setFont(undefined, 'bold');
-                            doc.setTextColor(22, 160, 133);
-                            doc.setFontSize(11);
-                            const precio = `$${parseFloat(product.precio_unitario).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`;
-                            doc.text(precio, pageWidth - margin - 3, yPosition + rowH / 2, { align: 'right', baseline: 'middle' });
-
-                            yPosition += rowH;
-                        }
-                        yPosition += 5;
-                    }
-                }
-                
-                // 5. Agregar pie de página con numeración
-                const totalPages = doc.internal.getNumberOfPages();
-                
-                for (let i = 1; i <= totalPages; i++) {
-                    doc.setPage(i);
-                    doc.setFontSize(7);
-                    doc.setTextColor(150);
-                    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 3, { align: 'right' });
-                }
-            
-                // 6. Guardar el archivo con nombre según formato
-                const fileName = options.format === 'catalog' 
-                    ? `catalogo-productos-${new Date().toISOString().slice(0,10)}.pdf`
-                    : `lista-de-precios-${new Date().toISOString().slice(0,10)}.pdf`;
-                
-                doc.save(fileName);
-                setPdfLoading(false);
+                finally { setPdfLoading(false); }
             };
-        
+
             const handleLogin = React.useCallback(async (email, password) => {
                 setLoading(true); setError(null);
                 try {
@@ -1396,7 +1148,7 @@
                         fetchProductos={fetchProductos}
                         onShowRenameModal={setRenamingCategory}
                         onShowManageModal={setManagingCategory}
-                        onShowPdfOptionsModal={() => setIsPdfModalOpen(true)}
+                        onShowPdfOptionsModal={() => { setPdfError(''); setIsPdfModalOpen(true); }}
                     />
                     {viewingPedidoId && (
                         <PedidoDetailModal
@@ -1461,10 +1213,8 @@
                     {isPdfModalOpen && (
                         <PdfOptionsModal
                             onClose={() => setIsPdfModalOpen(false)}
-                            onGenerate={(options) => {
-                                setIsPdfModalOpen(false);
-                                generatePdf(options);
-                            }}
+                            onGenerate={generatePdf}
+                            error={pdfError}
                             loading={pdfLoading}
                         />
                     )}

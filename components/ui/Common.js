@@ -11,11 +11,16 @@
  * para todos los demás scripts que se carguen después.
  */
 
-const NavItem = ({ icon, text, active, onClick }) => (<a href="#" onClick={onClick} className={`flex items-center px-4 py-3 rounded-lg transition-colors duration-200 ${ active ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white' }`}><span className="mr-3">{icon}</span><span className="font-medium">{text}</span></a>);
+const NavItem = ({ icon, text, active, onClick }) => (
+    <button type="button" aria-current={active ? 'page' : undefined} onClick={onClick}
+        className={`admin-nav-item w-full text-left flex items-center px-4 py-3 rounded-lg transition-colors duration-200 ${active ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
+        <span className="mr-3" aria-hidden="true">{icon}</span><span className="font-medium">{text}</span>
+    </button>
+);
 
 const EstadoBadge = ({ estado }) => {
-    const estados = { pendiente: 'Pendiente', visto: 'Visto', en_preparacion: 'En Preparación', facturado: 'Facturado', listo_para_entrega: 'Listo p/ Entrega', entregado: 'Entregado', cancelado: 'Cancelado', archivado: 'Archivado' };
-    const styles = { pendiente: 'bg-yellow-100 text-yellow-800', visto: 'bg-blue-100 text-blue-800', en_preparacion: 'bg-indigo-100 text-indigo-800', entregado: 'bg-green-100 text-green-800', listo_para_entrega: 'bg-purple-100 text-purple-800', facturado: 'bg-gray-200 text-gray-800', cancelado: 'bg-red-100 text-red-800', archivado: 'bg-gray-400 text-white' };
+    const estados = { programado: 'Programado', pendiente: 'Pendiente', visto: 'Visto', en_preparacion: 'En Preparación', facturado: 'Facturado', listo_para_entrega: 'Listo p/ Entrega', entregado: 'Entregado', cancelado: 'Cancelado', archivado: 'Archivado' };
+    const styles = { programado: 'bg-teal-100 text-teal-800', pendiente: 'bg-yellow-100 text-yellow-800', visto: 'bg-blue-100 text-blue-800', en_preparacion: 'bg-indigo-100 text-indigo-800', entregado: 'bg-green-100 text-green-800', listo_para_entrega: 'bg-purple-100 text-purple-800', facturado: 'bg-gray-200 text-gray-800', cancelado: 'bg-red-100 text-red-800', archivado: 'bg-gray-400 text-white' };
     return (<span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${styles[estado] || 'bg-gray-100 text-gray-800'}`}>{estados[estado] || estado}</span>);
 };
 

@@ -4,13 +4,18 @@
  * Consume los endpoints GET /api/reportes/* del backend.
  */
 
-const ReportesView = () => {
+const ReportesView = ({ onSelectPedido }) => {
+    const reportRef = React.useRef(null);
     const token = localStorage.getItem('token');
 
     // --- Estado de fechas y tab activa ---
-    const hoy = new Date().toISOString().slice(0, 10);
-    const inicioSemana = new Date(Date.now() - 6 * 86400000).toISOString().slice(0, 10);
+    const localDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const hoy = localDate(new Date());
+    const inicioSemana = localDate(new Date(Date.now() - 6 * 86400000));
 
+    const [rowSearch, setRowSearch] = React.useState('');
+    const [tableSearch, setTableSearch] = React.useState('');
+    const queryController = React.useRef(null);
     const [activeTab, setActiveTab] = React.useState('resumen');
     const [startDate, setStartDate] = React.useState(inicioSemana);
     const [endDate, setEndDate] = React.useState(hoy);
@@ -18,6 +23,8 @@ const ReportesView = () => {
     const [orderBy, setOrderBy] = React.useState('cantidad'); // backend sort for productos
     const [filtroCategoria, setFiltroCategoria] = React.useState('');
 
+    const requestVersion = React.useRef(0);
+    const [diario, setDiario] = React.useState(null);
     const [resumen, setResumen] = React.useState(null);
     const [vendedores, setVendedores] = React.useState(null);
     const [entregados, setEntregados] = React.useState(null);
@@ -34,46 +41,84 @@ const ReportesView = () => {
     const [errorAnalisis, setErrorAnalisis] = React.useState(null);
     const [modalClienteId, setModalClienteId] = React.useState(null);
 
-    const apiFetch = async (path) => {
-        const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    const apiFetch = async (path, signal) => {
+        const res = await fetch(`${API_URL}${path}`, { signal, headers: { Authorization: `Bearer ${token}` } });
         if (!res.ok) throw new Error(`Error al cargar ${path}`);
         return res.json();
     };
 
     const fmt = (n) => parseFloat(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const fmtN = (n) => parseInt(n || 0).toLocaleString('es-AR');
+    const fmtN = (n) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 3 });
+
+    React.useEffect(() => () => { requestVersion.current++; queryController.current?.abort(); }, []);
 
     const cargar = async () => {
+        const version = ++requestVersion.current;
+        queryController.current?.abort();
+        if (activeTab !== 'inactivos' && (!startDate || !endDate || startDate>endDate)) { setError('Elegí un rango de fechas válido.'); setLoading(false); return; }
+        const controller = new AbortController();
+        queryController.current = controller;
+        const request = path => apiFetch(path, controller.signal);
         setLoading(true);
         setError(null);
         try {
+            const apply = (setter, data) => { if (version === requestVersion.current) setter(data); };
             const qs = `?startDate=${startDate}&endDate=${endDate}`;
-            if (activeTab === 'resumen')     setResumen(await apiFetch(`/reportes/resumen-ejecutivo${qs}`));
-            if (activeTab === 'diario')      setDiario(await apiFetch(`/reportes/diario-pedidos${qs}`));
-            if (activeTab === 'vendedores')  setVendedores(await apiFetch(`/reportes/pedidos-por-vendedor${qs}`));
-            if (activeTab === 'entregados')  setEntregados(await apiFetch(`/reportes/pedidos-entregados${qs}`));
-            if (activeTab === 'inactivos')   setInactivos(await apiFetch(`/reportes/clientes-inactivos?dias=${diasInactivo}`));
-            if (activeTab === 'productos')   setProductos(await apiFetch(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30${filtroCategoria ? `&categoria=${encodeURIComponent(filtroCategoria)}` : ''}`));
-            if (activeTab === 'faltantes')   setFaltantes(await apiFetch(`/reportes/faltantes-historico${qs}`));
-            if (activeTab === 'categorias')  setCategorias(await apiFetch(`/reportes/categorias-comparativa${qs}`));
+            if (activeTab === 'resumen')     apply(setResumen, await request(`/reportes/resumen-ejecutivo${qs}`));
+            if (activeTab === 'diario')      apply(setDiario, await request(`/reportes/diario-pedidos${qs}`));
+            if (activeTab === 'vendedores')  apply(setVendedores, await request(`/reportes/pedidos-por-vendedor${qs}`));
+            if (activeTab === 'entregados')  apply(setEntregados, await request(`/reportes/pedidos-entregados${qs}`));
+            if (activeTab === 'inactivos')   apply(setInactivos, await request(`/reportes/clientes-inactivos?dias=${diasInactivo}`));
+            if (activeTab === 'productos')   apply(setProductos, await request(`/reportes/productos-mas-pedidos${qs}&orderBy=${orderBy}&limit=30${filtroCategoria ? `&categoria=${encodeURIComponent(filtroCategoria)}` : ''}`));
+            if (activeTab === 'faltantes')   apply(setFaltantes, await request(`/reportes/faltantes-historico${qs}`));
+            if (activeTab === 'categorias')  apply(setCategorias, await request(`/reportes/categorias-comparativa${qs}`));
         } catch (e) {
-            setError(e.message);
+            if (version === requestVersion.current) setError(e.message);
         } finally {
-            setLoading(false);
+            if (version === requestVersion.current) setLoading(false);
         }
     };
 
-    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria, diasInactivo]);
+    React.useEffect(() => { cargar(); }, [activeTab, filtroCategoria, diasInactivo, startDate, endDate, orderBy]);
 
-    const TABS = [
-        { id: 'resumen',    label: '📊 Resumen' },
-        { id: 'vendedores', label: '🏆 Vendedores' },
-        { id: 'entregados', label: '✅ Entregados' },
-        { id: 'inactivos',  label: '💤 Inactivos' },
-        { id: 'productos',  label: '📦 Productos' },
-        { id: 'faltantes',  label: '⚠️ Faltantes' },
-        { id: 'categorias', label: '📁 Categorías' },
+    const exportarTablas = () => {
+        const rows = Array.from(reportRef.current.querySelectorAll('table')).flatMap(table => [...Array.from(table.rows).map(row=>Array.from(row.cells).map(cell=>cell.innerText.trim())), []]);
+        if (!rows.length) { alert('No hay tablas para exportar en esta vista.'); return; }
+        const quote = value => '"' + (/^[=+@-]/.test(value) ? "'" + value : value).replace(/"/g,'""') + '"';
+        const url = URL.createObjectURL(new Blob(['\ufeff'+rows.map(row=>row.map(quote).join(';')).join('\r\n')], {type:'text/csv;charset=utf-8;'}));
+        const a=document.createElement('a');a.href=url;a.download=`reporte-${activeTab}-${startDate}-${endDate}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    };
+
+    const reportGroups = [
+        { title: 'Operación', tabs: [
+            ['resumen', 'Resumen ejecutivo', 'Medí el volumen de pedidos y las tasas de entrega y cancelación.'],
+            ['diario', 'Operación diaria', 'Revisá el volumen y la composición de los pedidos del período.'],
+            ['entregados', 'Entregas', 'Buscá un pedido entregado y abrí el detalle para revisar sus datos.']
+        ] },
+        { title: 'Comercial', tabs: [
+            ['vendedores', 'Vendedores', 'Compará cobertura, cantidad de pedidos y valor vendido por persona.'],
+            ['inactivos', 'Recuperar clientes', 'Priorizá clientes con historial y contactalos desde el listado.']
+        ] },
+        { title: 'Catálogo', tabs: [
+            ['productos', 'Demanda', 'Ordená por unidades o monto para decidir qué reponer.'],
+            ['faltantes', 'Faltantes', 'Detectá qué productos se quitaron de pedidos y con qué frecuencia.'],
+            ['categorias', 'Categorías', 'Compará la participación por categoría y abrí sus productos.']
+        ] }
     ];
+    const [, reportTitle, reportPurpose] = reportGroups.flatMap(group => group.tabs).find(([id]) => id === activeTab);
+    const filterRows = rows => {
+        const query = normalizeDeliveryZone(tableSearch);
+        if (!query) return rows;
+        return rows.filter(row => Object.values(row).some(value =>
+            (typeof value === 'string' || typeof value === 'number') && normalizeDeliveryZone(value).includes(query)
+        ));
+    };
+    const quickRange = days => {
+        const from = new Date();
+        from.setDate(from.getDate() - days + 1);
+        setStartDate(localDate(from));
+        setEndDate(hoy);
+    };
 
     // ── Abrir modal de análisis de cliente inactivo ──────────────────────
     const abrirAnalisis = async (clienteId) => {
@@ -297,7 +342,7 @@ const ReportesView = () => {
             orange: 'from-orange-400 to-orange-600',
         };
         return (
-            <div className={`bg-gradient-to-br ${colors[color]} text-white rounded-xl p-5 shadow`}>
+            <div className={`report-metric bg-white border text-gray-800 rounded-xl p-5 shadow-sm`}>
                 <p className="text-sm font-medium opacity-80">{label}</p>
                 <p className="text-3xl font-bold mt-1">{value}</p>
                 {sub && <p className="text-xs opacity-70 mt-1">{sub}</p>}
@@ -330,11 +375,28 @@ const ReportesView = () => {
                         </select>
                     </div>
                 )}
-                <button onClick={cargar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition">
+                <button disabled={loading} onClick={cargar} className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2 rounded-lg text-sm transition">
                     Consultar
                 </button>
             </div>
         );
+    };
+
+    const ReportBars = ({ title, rows, labelKey, valueKey, format = fmtN }) => {
+        const points = rows.slice(0, 7);
+        if (!points.length) return null;
+        const max = Math.max(1, ...points.map(row => Number(row[valueKey]) || 0));
+        return <section className="workspace-toolbar">
+            <h3 className="font-bold mb-3">{title}</h3>
+            <ol className="space-y-3">{points.map(row => (
+                <li key={row[labelKey]} className="text-sm">
+                    <div className="flex justify-between gap-2"><span>{row[labelKey]}</span><strong>{format(row[valueKey])}</strong></div>
+                    <div className="mt-1 h-2 rounded-full bg-gray-100" aria-hidden="true">
+                        <div className="h-full rounded-full bg-teal-600" style={{ width: `${Math.max(0, Number(row[valueKey]) || 0) / max * 100}%` }} />
+                    </div>
+                </li>
+            ))}</ol>
+        </section>;
     };
 
     // ─── Contenido por tab ───
@@ -352,6 +414,7 @@ const ReportesView = () => {
                         </p>
                     </div>
                 </div>
+                <ReportBars title="Volumen por estado" rows={diario.por_estado} labelKey="estado" valueKey="total_pedidos" />
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <Card label="Total pedidos (activos)" value={fmtN(r.total_pedidos)} color="blue" />
                     <Card label="Monto total" value={`$${fmt(r.monto_total)}`} color="green" />
@@ -372,7 +435,7 @@ const ReportesView = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {diario.por_estado.map(e => (
+                            {filterRows(diario.por_estado).map(e => (
                                 <tr key={e.estado} className="hover:bg-gray-50">
                                     <td className="px-4 py-2"><BadgeEstado estado={e.estado} /></td>
                                     <td className="px-4 py-2 text-right font-semibold">{fmtN(e.total_pedidos)}</td>
@@ -391,6 +454,8 @@ const ReportesView = () => {
         if (!vendedores) return null;
         const { items: sorted, requestSort, sortConfig } = useSortableData(vendedores.vendedores, { key: 'monto_total', direction: 'descending' });
         return (
+            <div className="space-y-4">
+            <ReportBars title="Mayor valor de pedidos" rows={[...vendedores.vendedores].sort((a,b) => Number(b.monto_total) - Number(a.monto_total))} labelKey="vendedor" valueKey="monto_total" format={value => `$${fmt(value)}`} />
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                 <div className="px-5 py-3 border-b bg-gray-50">
                     <h3 className="font-bold text-gray-700">Rendimiento por vendedor</h3>
@@ -408,7 +473,7 @@ const ReportesView = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {sorted.map((v, i) => (
+                            {filterRows(sorted).map((v, i) => (
                                 <tr key={v.vendedor_id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3 font-semibold text-gray-800">{v.vendedor}</td>
                                     <td className="px-4 py-3 text-right">{fmtN(v.total_pedidos)}</td>
@@ -424,6 +489,7 @@ const ReportesView = () => {
                         <p className="text-center text-gray-400 py-8">No hay datos para el período seleccionado.</p>
                     )}
                 </div>
+            </div>
             </div>
         );
     };
@@ -453,9 +519,9 @@ const ReportesView = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {entregados.pedidos.map(p => (
+                                {filterRows(entregados.pedidos).map(p => (
                                     <tr key={p.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2 font-bold text-blue-600">#{p.id}</td>
+                                        <td className="px-4 py-2"><button onClick={() => onSelectPedido(p.id)} className="font-bold text-teal-700">#{p.id}</button></td>
                                         <td className="px-4 py-2 font-semibold">{p.nombre_comercio}</td>
                                         <td className="px-4 py-2 text-gray-500 text-xs">{p.direccion}</td>
                                         <td className="px-4 py-2">{p.vendedor}</td>
@@ -510,11 +576,11 @@ const ReportesView = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {sorted.map(c => (
+                                {filterRows(sorted).map(c => (
                                     <tr key={c.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-2 font-semibold">{c.nombre_comercio}</td>
                                         <td className="px-4 py-2 text-gray-600">{c.nombre_contacto || '—'}</td>
-                                        <td className="px-4 py-2 text-gray-600">{c.telefono || '—'}</td>
+                                        <td className="px-4 py-2 text-gray-600">{c.telefono ? <a className="text-teal-700" href={`tel:${String(c.telefono).replace(/[^0-9+]/g, '')}`}>{c.telefono}</a> : '—'}</td>
                                         <td className="px-4 py-2 text-right">{fmtN(c.total_pedidos_historicos)}</td>
                                         <td className="px-4 py-2 text-sm">
                                             {c.ultimo_pedido
@@ -526,7 +592,7 @@ const ReportesView = () => {
                                                 onClick={() => abrirAnalisis(c.id)}
                                                 className="bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-lg border border-blue-200 transition"
                                             >
-                                                + Info
+                                                Ver historial
                                             </button>
                                         </td>
                                     </tr>
@@ -542,9 +608,10 @@ const ReportesView = () => {
 
     const TabProductos = () => {
         if (!productos) return null;
-        const { items: sorted, requestSort, sortConfig } = useSortableData(productos.productos, { key: 'unidades_vendidas', direction: 'descending' });
+        const { items: sorted, requestSort, sortConfig } = useSortableData(productos.productos, { key: orderBy === 'monto' ? 'monto_total' : 'unidades_vendidas', direction: 'descending' });
         return (
             <div className="space-y-4">
+                <ReportBars title={orderBy === 'monto' ? 'Mayor valor de pedidos' : 'Mayor demanda por unidades'} rows={productos.productos} labelKey="nombre_producto" valueKey={orderBy === 'monto' ? 'monto_total' : 'unidades_vendidas'} format={orderBy === 'monto' ? value => `$${fmt(value)}` : fmtN} />
                 {filtroCategoria && (
                     <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex justify-between items-center text-sm shadow-sm">
                         <span>Filtrando por categoría: <strong className="text-blue-900 text-base ml-1">{filtroCategoria}</strong></span>
@@ -553,7 +620,7 @@ const ReportesView = () => {
                 )}
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="px-5 py-3 border-b bg-gray-50 flex justify-between items-center">
-                    <h3 className="font-bold text-gray-700">Top {productos.total_productos} productos — ordenados por {productos.order_by === 'monto' ? 'monto (backend)' : 'unidades (backend)'}</h3>
+                    <h3 className="font-bold text-gray-700">Top {productos.total_productos} productos — ordenados por {productos.order_by === 'monto' ? 'valor de pedidos' : 'unidades'}</h3>
                 </div>
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
@@ -570,7 +637,7 @@ const ReportesView = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {sorted.map((p, i) => (
+                            {filterRows(sorted).map((p, i) => (
                                 <tr key={p.producto_id} className="hover:bg-gray-50">
                                     <td className="px-4 py-2 text-gray-400 font-bold">{i + 1}</td>
                                     <td className="px-4 py-2 font-semibold text-gray-800">{p.nombre_producto}</td>
@@ -598,6 +665,7 @@ const ReportesView = () => {
 
         return (
             <div className="space-y-6">
+                <ReportBars title="Faltantes para priorizar" rows={faltantes.resumen_por_producto} labelKey="nombre_producto" valueKey="total_faltante" />
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="px-5 py-3 border-b bg-gray-50">
                         <h3 className="font-bold text-gray-700">Resumen por producto</h3>
@@ -611,7 +679,7 @@ const ReportesView = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y">
-                            {sortedResumen.map(f => (
+                            {filterRows(sortedResumen).map(f => (
                                 <tr key={f.nombre_producto} className="hover:bg-gray-50">
                                     <td className="px-4 py-2 font-semibold">{f.nombre_producto}</td>
                                     <td className="px-4 py-2 text-right font-bold text-red-600">{fmtN(f.total_faltante)}</td>
@@ -640,9 +708,9 @@ const ReportesView = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {sortedRegistros.map(r => (
+                                {filterRows(sortedRegistros).map(r => (
                                     <tr key={r.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-2 font-bold text-blue-600">#{r.pedido_id}</td>
+                                        <td className="px-4 py-2"><button onClick={() => onSelectPedido(r.pedido_id)} className="font-bold text-teal-700">#{r.pedido_id}</button></td>
                                         <td className="px-4 py-2">{r.nombre_producto}</td>
                                         <td className="px-4 py-2 text-right">{r.cantidad_original}</td>
                                         <td className="px-4 py-2 text-gray-600">{r.modificado_por}</td>
@@ -674,11 +742,12 @@ const ReportesView = () => {
         };
         return (
             <div className="space-y-6">
+                <ReportBars title="Valor de pedidos por día · últimas 7 fechas con actividad" rows={(resumen.por_dia || []).slice(-7).map(row => ({ ...row, dia: String(row.fecha).slice(0,10) }))} labelKey="dia" valueKey="ingresos" format={value => `$${fmt(value)}`} />
                 <div className="bg-gray-50 border rounded-xl p-3 text-sm text-gray-500">
                     Período: <strong>{new Date(resumen.periodo.desde+'T00:00:00').toLocaleDateString('es-AR')}</strong> al <strong>{new Date(resumen.periodo.hasta+'T00:00:00').toLocaleDateString('es-AR')}</strong> — {resumen.periodo.dias} días
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <KpiCard label="Ingresos totales" value={`$${fmt(k.ingresos_totales)}`} color="green" />
+                    <KpiCard label="Valor de pedidos" value={`$${fmt(k.ingresos_totales)}`} color="green" />
                     <KpiCard label="Ticket promedio" value={`$${fmt(k.ticket_promedio)}`} sub="por pedido" color="blue" />
                     <KpiCard label="Pedidos activos" value={fmtN(k.total_pedidos)} sub={`${k.pedidos_por_dia}/día prom.`} color="purple" />
                     <KpiCard label="Clientes atendidos" value={fmtN(k.clientes_atendidos)} color="orange" />
@@ -692,7 +761,7 @@ const ReportesView = () => {
                             <tr><th className="px-4 py-2 text-left">Estado</th><th className="px-4 py-2 text-right">Pedidos</th><th className="px-4 py-2 text-right">Clientes</th><th className="px-4 py-2 text-right">Monto</th></tr>
                         </thead>
                         <tbody className="divide-y">
-                            {resumen.por_estado.map(e => (
+                            {filterRows(resumen.por_estado).map(e => (
                                 <tr key={e.estado} className="hover:bg-gray-50">
                                     <td className="px-4 py-2"><BadgeEstado estado={e.estado} /></td>
                                     <td className="px-4 py-2 text-right font-semibold">{fmtN(e.total_pedidos)}</td>
@@ -713,8 +782,9 @@ const ReportesView = () => {
         const { items: sorted, requestSort, sortConfig } = useSortableData(categorias.categorias, { key: 'monto_total', direction: 'descending' });
         return (
             <div className="space-y-4">
+                <ReportBars title="Participación por categoría" rows={categorias.categorias} labelKey="categoria" valueKey="pct_del_total" format={value => `${value}%`} />
                 <div className="bg-gray-50 border rounded-xl p-3 text-sm text-gray-500">
-                    Ingreso global del período: <strong className="text-green-700">${fmt(categorias.monto_global)}</strong> · {categorias.total_categorias} categorías activas
+                    Valor de pedidos del período: <strong className="text-green-700">${fmt(categorias.monto_global)}</strong> · {categorias.total_categorias} categorías activas
                 </div>
                 <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
@@ -731,15 +801,13 @@ const ReportesView = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {sorted.map((c, i) => (
+                                {filterRows(sorted).map((c, i) => (
                                     <tr 
                                         key={c.categoria} 
-                                        className="hover:bg-blue-50 cursor-pointer transition-colors"
-                                        onClick={() => { setFiltroCategoria(c.categoria); setActiveTab('productos'); }}
-                                        title="Ver productos de esta categoría"
+                                        className="hover:bg-blue-50 transition-colors"
                                     >
                                         <td className="px-4 py-3 font-semibold text-blue-600 hover:underline">
-                                            <span className="text-gray-400 mr-2 no-underline">{i+1}</span>{c.categoria}
+                                            <button onClick={() => { setFiltroCategoria(c.categoria); setActiveTab('productos'); setRowSearch(''); setTableSearch(''); }} className="text-left"><span className="text-gray-400 mr-2">{i+1}</span>{c.categoria}</button>
                                         </td>
                                         <td className="px-4 py-3 text-right font-bold text-green-700">${fmt(c.monto_total)}</td>
                                         <td className="px-4 py-3 text-right">
@@ -775,30 +843,36 @@ const ReportesView = () => {
 
     return (
         <React.Fragment>
-        <div className="p-4 md:p-6 space-y-4">
+        <div ref={reportRef} className="reports-workspace p-4 md:p-6 space-y-4">
             <div>
                 <h1 className="text-2xl font-bold text-gray-800">Reportes</h1>
-                <p className="text-sm text-gray-500">Métricas de gestión y toma de decisiones</p>
+                <p className="text-sm text-gray-500">Ventas, operación y recuperación de clientes en un solo lugar.</p>
             </div>
 
-            {/* Tabs */}
-            <div className="flex flex-wrap gap-2">
-                {TABS.map(t => (
-                    <button
-                        key={t.id}
-                        onClick={() => setActiveTab(t.id)}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                            activeTab === t.id
-                                ? 'bg-blue-600 text-white shadow'
-                                : 'bg-white border text-gray-600 hover:bg-gray-50'
-                        }`}
-                    >
-                        {t.label}
-                    </button>
-                ))}
-            </div>
-
-            {/* Filtros */}
+            <nav className="report-nav" aria-label="Secciones de reportes">
+                {reportGroups.map(group => <div key={group.title}>
+                    <p className="report-nav-label">{group.title}</p>
+                    <div className="flex flex-wrap gap-2">{group.tabs.map(([id, title]) => (
+                        <button key={id} aria-pressed={activeTab === id} onClick={() => { setActiveTab(id); setRowSearch(''); setTableSearch(''); }}
+                            className="report-nav-button">{title}</button>
+                    ))}</div>
+                </div>)}
+            </nav>
+            <section className="workspace-toolbar">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div><h2 className="text-xl font-bold">{reportTitle}</h2><p className="text-sm text-gray-600 mt-1">{reportPurpose}</p></div>
+                    <button disabled={loading || !!error} onClick={exportarTablas} className="border rounded-lg px-3 py-2 text-sm">Descargar tablas CSV</button>
+                </div>
+                <div className="flex flex-wrap items-end gap-3 mt-4">
+                    <label className="text-sm">Buscar en el detalle
+                        <input type="search" value={rowSearch} onChange={e => setRowSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') setTableSearch(rowSearch); }} placeholder="Nombre, código o estado" className="block border rounded-lg px-3 py-2" />
+                    </label>
+                    <button onClick={() => setTableSearch(rowSearch)} className="border rounded-lg px-3 py-2 text-sm">Filtrar filas</button>
+                    {activeTab !== 'inactivos' && [7, 30].map(days => (
+                        <button key={days} onClick={() => quickRange(days)} className="period-button border rounded-lg px-3 py-2 text-sm">Últimos {days} días</button>
+                    ))}
+                </div>
+            </section>
             <FiltroFechas />
 
             {/* Contenido */}

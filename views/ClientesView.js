@@ -15,6 +15,11 @@ const ClientesView = ({ user, onShowClienteForm }) => {
     const [clientes, setClientes] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [error, setError] = React.useState(null);
+    const [zoneFilter, setZoneFilter] = React.useState('');
+    const [zoneClient, setZoneClient] = React.useState(null);
+    const [selectedZone, setSelectedZone] = React.useState('');
+    const [savingZone, setSavingZone] = React.useState(false);
+    const [zoneError, setZoneError] = React.useState('');
     const [searchTerm, setSearchTerm] = React.useState('');
     const token = localStorage.getItem('token');
     const { items: sortedClientes, requestSort, sortConfig } = useSortableData(clientes, { key: 'nombre_comercio', direction: 'ascending' });
@@ -36,7 +41,32 @@ const ClientesView = ({ user, onShowClienteForm }) => {
             } catch (err) { alert(err.message); }
         }
     };
-    const filteredClientes = sortedClientes.filter(c => c.nombre_comercio.toLowerCase().includes(searchTerm.toLowerCase()) || (c.nombre_contacto && c.nombre_contacto.toLowerCase().includes(searchTerm.toLowerCase())));
+    const openZone = cliente => {
+        setZoneClient(cliente);
+        setSelectedZone((cliente.zona_manual && canonicalDeliveryZone(cliente.zona)) || suggestDeliveryZone(cliente, clientes) || canonicalDeliveryZone(cliente.zona) || canonicalDeliveryZone(cliente.localidad) || '');
+        setZoneError('');
+    };
+    const saveZone = async () => {
+        if (!selectedZone || savingZone) return;
+        setSavingZone(true);
+        setZoneError('');
+        try {
+            const response = await fetch(`${API_URL}/clientes/${zoneClient.id}/zona`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ zona: selectedZone })
+            });
+            if (!response.ok) throw new Error('No se pudo guardar la zona operativa.');
+            const updated = await response.json();
+            setClientes(current => current.map(c => c.id === updated.id ? updated : c));
+            setZoneClient(null);
+        } catch (err) {
+            setZoneError(err.message);
+        } finally {
+            setSavingZone(false);
+        }
+    };
+    const filteredClientes = sortedClientes.filter(c => !zoneFilter || (zoneFilter === "pendiente" ? !c.zona_manual : canonicalDeliveryZone(c.zona) === zoneFilter)).filter(c => c.nombre_comercio.toLowerCase().includes(searchTerm.toLowerCase()) || (c.nombre_contacto && c.nombre_contacto.toLowerCase().includes(searchTerm.toLowerCase())));
     const isAdmin = user.rol === 'admin';
     return (
         <div>
@@ -47,6 +77,25 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                     {isAdmin && (<button onClick={() => onShowClienteForm({})} className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg flex items-center justify-center shrink-0"><PlusIcon className="h-5 w-5 mr-2" /> Agregar</button>)}
                 </div>
             </div>
+            <div className="workspace-toolbar mb-4 flex items-center flex-wrap gap-3">
+                <label className="text-sm">Zona de reparto <select value={zoneFilter} onChange={e => setZoneFilter(e.target.value)} className="ml-2 border rounded-lg p-2">
+                    <option value="">Todas</option><option value="pendiente">Por confirmar</option>
+                    {DELIVERY_ZONES.map(zona => <option key={zona}>{zona}</option>)}
+                </select></label>
+                <span className="text-sm text-gray-500">{filteredClientes.length} clientes</span>
+            </div>
+            {zoneClient && <DialogFrame label="Zona de reparto" busy={savingZone} onClose={() => setZoneClient(null)}>
+                <div className="bg-white w-full max-w-lg p-6 space-y-4">
+                    <h2 className="font-bold text-xl">{zoneClient.nombre_comercio}</h2>
+                    <p className="text-sm text-gray-500">La sugerencia GPS usa clientes cercanos con una zona confirmada. Revisá el nombre de reparto antes de guardar.</p>
+                    <p className="text-sm">{zoneClient.direccion} · GPS {zoneClient.latitud && zoneClient.longitud ? 'registrado' : 'pendiente'}</p>
+                    <label className="block text-sm">Zona operativa
+                        <select className="block w-full border p-2 rounded-lg" value={selectedZone} onChange={e => setSelectedZone(e.target.value)}><option value="">Seleccionar zona</option>{DELIVERY_ZONES.map(zona => <option key={zona}>{zona}</option>)}</select>
+                    </label>
+                    {zoneError && <p role="alert" className="text-red-700">{zoneError}</p>}
+                    <button disabled={savingZone || !selectedZone} onClick={saveZone} className="bg-blue-600 text-white rounded-lg px-4 py-2">Confirmar zona</button>
+                </div>
+            </DialogFrame>}
             {/* Vista tabla — Desktop */}
             <div className="bg-white rounded-xl shadow-lg overflow-hidden hidden md:block">
                 <div className="overflow-x-auto">
@@ -57,6 +106,7 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                             <thead className="bg-gray-50"><tr>
                                 <TableHeader sortKey="nombre_comercio" sortConfig={sortConfig} onSort={requestSort}>Comercio</TableHeader>
                                 <TableHeader sortKey="nombre_contacto" sortConfig={sortConfig} onSort={requestSort}>Contacto</TableHeader>
+                                <th className="px-6 py-3 text-left">Zona operativa</th>
                                 <TableHeader sortKey="telefono" sortConfig={sortConfig} onSort={requestSort}>Teléfono</TableHeader>
                                 <TableHeader sortKey="vendedor_nombre" sortConfig={sortConfig} onSort={requestSort}>Vendedor</TableHeader>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Detalles / Horarios</th>
@@ -67,6 +117,7 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                                     <tr key={cliente.id} className="hover:bg-gray-50">
                                         <td className="px-6 py-4 text-sm font-medium text-gray-900">{cliente.nombre_comercio}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{cliente.nombre_contacto}</td>
+                                        <td className="px-6 py-4 text-sm">{isAdmin ? <button className="text-teal-700 font-semibold" onClick={() => openZone(cliente)}>{cliente.zona || 'Asignar zona'}{cliente.zona_manual ? '' : ' · revisar'}</button> : (cliente.zona || '—')}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{cliente.telefono}</td>
                                         <td className="px-6 py-4 text-sm text-gray-700">{cliente.vendedor_nombre || 'Sin asignar'}</td>
                                         <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={cliente.direccion}>
@@ -111,6 +162,7 @@ const ClientesView = ({ user, onShowClienteForm }) => {
                             {cliente.direccion && <p><span className="font-medium">Detalles:</span> {cliente.direccion}</p>}
                             {cliente.horario_atencion && <p className="text-blue-600 font-medium mt-1">🕒 Horarios Configurados</p>}
                         </div>
+                        {isAdmin && <button className="text-sm text-teal-700" onClick={() => openZone(cliente)}>{cliente.zona || "Asignar zona"}</button>}
                     </div>
                 ))}
                 {!loading && filteredClientes.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}

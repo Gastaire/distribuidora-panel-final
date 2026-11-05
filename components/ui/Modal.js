@@ -1,3 +1,48 @@
+// The stack keeps keyboard handling scoped to the most recently opened dialog.
+const adminDialogStack = [];
+const DialogFrame = ({ children, onClose, busy = false, label = 'Formulario', layer = 50 }) => {
+    const ref = React.useRef(null);
+    const latest = React.useRef({ onClose, busy });
+    latest.current = { onClose, busy };
+    React.useEffect(() => {
+        const node = ref.current;
+        const previousFocus = document.activeElement;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        adminDialogStack.push(node);
+        const focusable = () => Array.from(node.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+            .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+        const frame = requestAnimationFrame(() => (focusable()[0] || node).focus());
+        const handleKey = (event) => {
+            if (adminDialogStack[adminDialogStack.length - 1] !== node) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopPropagation();
+                if (!latest.current.busy) latest.current.onClose();
+            }
+            if (event.key === 'Tab') {
+                const items = focusable();
+                const first = items[0];
+                const last = items[items.length - 1];
+                if (!first) { event.preventDefault(); node.focus(); }
+                else if (event.shiftKey && (document.activeElement === first || !node.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+                else if (!event.shiftKey && (document.activeElement === last || !node.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+            }
+        };
+        document.addEventListener('keydown', handleKey, true);
+        return () => {
+            cancelAnimationFrame(frame);
+            document.removeEventListener('keydown', handleKey, true);
+            const index = adminDialogStack.indexOf(node);
+            if (index >= 0) adminDialogStack.splice(index, 1);
+            document.body.style.overflow = previousOverflow;
+            if (previousFocus && previousFocus.isConnected) previousFocus.focus();
+        };
+    }, []);
+    return <div ref={ref} style={{ zIndex: layer }} role="dialog" aria-modal="true" aria-label={label} aria-busy={busy} tabIndex={-1}
+        className="dialog-overlay fixed inset-0 z-50 flex justify-center items-center p-4">{children}</div>;
+};
+
 /**
  * @file Contiene componentes de modales reutilizables.
  *
