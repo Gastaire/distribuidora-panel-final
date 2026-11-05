@@ -32,8 +32,8 @@ const ClienteFormModal = ({ cliente, onClose, onSuccess }) => {
                 telefono: cliente.telefono || '', 
                 vendedor_id: cliente.vendedor_id || '', 
                 vendedor_nombre: cliente.vendedor_nombre || '',
-                latitud: cliente.latitud || '',
-                longitud: cliente.longitud || '',
+                latitud: cliente.latitud ?? '',
+                longitud: cliente.longitud ?? '',
                 horario_atencion: cliente.horario_atencion || '',
                 horario_entrega: cliente.horario_entrega || cliente.horario_recepcion || ''
             }); 
