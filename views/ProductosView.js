@@ -160,7 +160,7 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                 <div className="hidden md:block overflow-x-auto">
                     {loading && <div className="p-6 flex justify-center"><Spinner className="border-blue-500"/></div>}
                     {error && <p className="p-6 text-red-500">{error}</p>}
-                    {!loading && !error && (
+                    {!error && (
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50"><tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Imagen</th>
@@ -209,7 +209,7 @@ const ProductosView = ({ user, onShowProductoForm, onShowImportModal, productos,
                 <div className="md:hidden">
                     {loading && <div className="p-4 flex justify-center"><Spinner className="border-blue-500"/></div>}
                     {error && <p className="p-4 text-red-500">{error}</p>}
-                    {!loading && !error && (
+                    {!error && (
                         <div className="divide-y divide-gray-100">
                             {filteredProductos.map((producto) => (
                                 <div key={producto.id} className={`flex items-center gap-3 p-4 ${producto.archivado ? 'opacity-50 bg-gray-50' : 'bg-white'}`}>

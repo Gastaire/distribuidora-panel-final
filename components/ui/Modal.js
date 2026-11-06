@@ -75,7 +75,7 @@ const PasswordConfirmModal = ({ title, message, onConfirm, onClose, loading }) =
             });
             const data = await response.json();
             if (!response.ok) throw new Error(data.message || 'Contraseña incorrecta.');
-            onConfirm();
+            onConfirm(password);
         } catch (err) {
             setError(err.message);
         }

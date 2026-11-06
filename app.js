@@ -38,6 +38,7 @@
             const [options, setOptions] = React.useState({
                 format: 'price-list', // Valores posibles: 'price-list', 'catalog'
                 stock: 'in-stock',
+                withPrices: true,
             });
         
             const handleOptionChange = (type, value) => {
@@ -89,6 +90,7 @@
                                 </div>
                             </div>
                             <div>
+                                <label className="block mb-4"><input type="checkbox" checked={options.withPrices} onChange={event => handleOptionChange('withPrices', event.target.checked)} /> Incluir precios (validez de 48 horas). Sin precios deja espacio para etiquetas.</label>
                                 <h3 className="text-lg font-semibold text-gray-700 mb-2">2. Elige qué productos incluir</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <OptionButton 
@@ -161,6 +163,8 @@
             const [loading, setLoading] = React.useState(true);
             const [error, setError] = React.useState(null);
             const [isEditing, setIsEditing] = React.useState(false);
+            const [pricePassword, setPricePassword] = React.useState('');
+            const [confirmPrices, setConfirmPrices] = React.useState(false);
             const [editableItems, setEditableItems] = React.useState([]);
             const [allProducts, setAllProducts] = React.useState([]);
             const [productSearch, setProductSearch] = React.useState('');
@@ -277,10 +281,11 @@
             };
         
             const handleSaveChanges = async () => {
-                const itemsToSave = editableItems.map(item => ({ producto_id: item.producto_id, cantidad: item.cantidad })).filter(item => item.cantidad > 0);
+                const itemsToSave = editableItems.map(item => ({ producto_id: item.producto_id, cantidad: item.cantidad, ...(pricePassword ? { precio_congelado: item.precio_congelado } : {}) })).filter(item => item.cantidad > 0);
                 try {
-                    const response = await fetch(`${API_URL}/pedidos/${pedidoId}/items`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ items: itemsToSave }) });
-                    if (!response.ok) throw new Error('Error al guardar los cambios.');
+                    const response = await fetch(`${API_URL}/pedidos/${pedidoId}/items`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ items: itemsToSave, ...(pricePassword ? { password: pricePassword } : {}) }) });
+                    if (!response.ok) throw new Error((await response.json()).message || 'Error al guardar los cambios.');
+                    setPricePassword('');
                     setIsEditing(false);
                     // En lugar de cerrar, recargamos los datos
                     fetchAllData();
@@ -376,8 +381,11 @@
                                         <div><h3 className="font-bold text-gray-800 mb-2">Cliente</h3><p className="text-gray-600">{pedido.nombre_comercio}</p><p className="text-gray-500 text-sm">{pedido.direccion}</p></div>
                                         <div><h3 className="font-bold text-gray-800 mb-2">Información del Pedido</h3><p className="text-gray-600">Vendedor: <span className="font-semibold">{pedido.nombre_vendedor}</span></p><p className="text-gray-600">Fecha: <span className="font-semibold">{new Date(pedido.fecha_creacion).toLocaleString()}</span></p><p className="text-gray-600 flex items-center">Estado actual: <span className="ml-2"><EstadoBadge estado={pedido.estado}/></span></p></div>
                                     </div>
-                                    <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-gray-800">Items del Pedido</h3>{isAdmin && !isEditing && (<button onClick={() => setIsEditing(true)} className="bg-blue-100 text-blue-800 text-xs font-bold py-1 px-3 rounded-full">Editar Pedido</button>)}</div>
+                                    <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-gray-800">Items del Pedido</h3>{isAdmin && !isEditing && (<button onClick={() => { setPricePassword(''); setIsEditing(true); }} className="bg-blue-100 text-blue-800 text-xs font-bold py-1 px-3 rounded-full">Editar Pedido</button>)}</div>
                                     
+                                    {isAdmin && isEditing && !pricePassword && <button className="border rounded px-3 py-2 mb-3" onClick={() => setConfirmPrices(true)}>Editar precios</button>}
+                                    {confirmPrices && <PasswordConfirmModal title="Autorizar precios del pedido" message="Confirmá tu contraseña. Los importes se aplican solo a este pedido." onClose={() => setConfirmPrices(false)} onConfirm={password => { setPricePassword(password); setConfirmPrices(false); }} />}
+                                    {isEditing && pricePassword && <div className="border rounded p-3 mb-3 space-y-2"><p>Precios particulares de este pedido</p>{editableItems.map(item => <label key={item.producto_id} className="flex justify-between gap-3"><span>{item.nombre_producto}</span><input aria-label={`Precio de ${item.nombre_producto}`} className="border rounded w-28 p-1" type="number" min="0" step="0.01" value={item.precio_congelado} onChange={event => { const value = event.target.value; setEditableItems(rows => rows.map(row => row.producto_id === item.producto_id ? {...row, precio_congelado: value} : row)); }} /></label>)}</div>}
                                     {/* --- INICIO DE LA MODIFICACIÓN RESPONSIVE --- */}
                                     {/* Vista de Tabla para Escritorio */}
                                     <div className="hidden md:block border rounded-lg overflow-hidden mb-4">
@@ -445,7 +453,7 @@
                                                 )}
                                             </div>
                                             <div className="flex justify-end gap-4">
-                                                <button onClick={() => { setIsEditing(false); fetchAllData(); }} className="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
+                                                <button onClick={() => { setIsEditing(false); setPricePassword(''); fetchAllData(); }} className="bg-gray-200 text-gray-800 font-bold py-2 px-4 rounded-lg">Cancelar</button>
                                                 <button onClick={handleSaveChanges} className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg">Guardar Cambios</button>
                                             </div>
                                         </div>
@@ -524,7 +532,7 @@
                     <div className="print-header">
                         <div className="flex justify-between items-start text-sm mb-4">
                             <div className="w-1/3"><h1 className="text-lg font-bold">Mayorista Comestibles</h1></div>
-                            <div className="w-1/3 px-2 text-center"><h2 className="font-bold underline">Datos del Cliente</h2><p>{pedido.nombre_comercio}</p><p className="text-xs">{pedido.direccion}</p></div>
+                            <div className="w-1/3 px-2 text-center"><p className="text-xs">Vendedor: {pedido.nombre_vendedor || "Sin vendedor registrado"}</p><h2 className="font-bold underline">Datos del Cliente</h2><p>{pedido.nombre_comercio}</p><p className="text-xs">{pedido.direccion}</p></div>
                             <div className="w-1/3 text-right"><p><span className="font-bold">Pedido N°:</span> {pedido.id}</p><p><span className="font-bold">Fecha:</span> {new Date(pedido.fecha_creacion).toLocaleDateString()}</p></div>
                         </div>
                         <hr className="border-gray-600 my-2"/>
@@ -992,6 +1000,8 @@
             const fetchProductos = React.useCallback(async (includeArchived = false) => {
                 if (!token) return;
                 
+                const scroller = document.getElementById('contenido');
+                const scrollTop = scroller?.scrollTop || 0;
                 setLoadingProductos(true);
                 setErrorProductos(null);
                 
@@ -1016,6 +1026,7 @@
                     setErrorProductos(err.message);
                 } finally {
                     setLoadingProductos(false);
+                    requestAnimationFrame(() => { if (scroller?.isConnected) scroller.scrollTop = scrollTop; });
                 }
             }, [token]);
             // --- FIN DE LA MODIFICACIÓN ---
