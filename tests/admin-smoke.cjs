@@ -187,6 +187,29 @@ await page.getByRole('button',{name:'Agregar',exact:true}).click();
 await page.getByRole('dialog',{name:'Cliente',exact:true}).waitFor();
 await page.screenshot({path:'/tmp/distrimaxi-panel-mobile.png',fullPage:true,animations:'disabled'});
 await page.keyboard.press('Escape');
+await page.setViewportSize({width:1440,height:1000});
+const deliveryOrders = [
+ {id:81,cliente_id:22,nombre_comercio:'Comercio GPS QA',latitud:-26.95,longitud:-65.3,monto_total:250},
+ {id:82,cliente_id:23,nombre_comercio:'Sin GPS QA',monto_total:100}
+];
+await page.route('**/api/pedidos/hoja-ruta', route=>route.fulfill({json:deliveryOrders}));
+await page.route('https://routing.openstreetmap.de/**', route=>route.fulfill({json:route.request().url().includes('/table/') ? {code:'Ok',durations:[[0,300],[300,0]]} : {code:'Ok',routes:[{distance:2500,duration:300,geometry:{type:'LineString',coordinates:[[-65.33431335,-26.927315885],[-65.3,-26.95]]}}]}}));
+await page.getByRole('navigation').getByRole('button',{name:'Mapa y reparto',exact:true}).click();
+await page.getByRole('button',{name:'Todos los clientes',exact:true}).click();
+await page.locator('.leaflet-container').waitFor();
+await page.getByRole('button',{name:'Hoja de ruta actual',exact:true}).click();
+await page.getByRole('button',{name:'Calcular recorrido',exact:true}).click();
+await page.getByText('2.5 km', {exact:false}).waitFor();
+await page.getByText('Sin GPS, al final', {exact:false}).waitFor();
+await page.evaluate(()=>{window.print=()=>{window.printedRouteText=document.getElementById('printableHojaRuta').innerText;};});
+await page.getByRole('button',{name:'Recalcular e imprimir recorrido',exact:true}).click();
+await page.waitForFunction(()=>window.printedRouteText?.includes('Sin GPS QA'));
+assert.match(await page.evaluate(()=>window.printedRouteText), /Monto/);
+assert.match(await page.evaluate(()=>window.printedRouteText), /Llegada estimada/);
+await page.setViewportSize({width:390,height:844});
+assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Delivery planner fits mobile');
+await page.setViewportSize({width:1440,height:1000});
+await page.screenshot({path:'/tmp/distrimaxi-delivery-map.png',fullPage:true});
 console.log('PASS: KPI, refresh, dates, source switching, failure recovery, modal keyboard/focus, create endpoints, mobile navigation and overflow.');
 await browser.close();assert.equal(errors.length,0,errors.join('\n'));
 })();

@@ -881,6 +881,8 @@
                         return <DataIntegrityView onSelectPedido={onShowPedido} />;
                     case 'reportes':
                         return <ReportesView onSelectPedido={onShowPedido} />;
+                    case 'mapa':
+                        return isAdmin ? <MapaView /> : null;
                     case 'zonas':
                         return <ConfiguracionZonasView />;
                     case 'dashboard': 
@@ -913,6 +915,7 @@
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
                             {isAdmin && <NavItem icon={<TagIcon />} text="Categorías" active={currentPage === 'categorias'} onClick={() => handleNavItemClick('categorias')} />}
                             <NavItem icon={<UsersIcon />} text="Clientes" active={currentPage === 'clientes'} onClick={() => handleNavItemClick('clientes')} />
+                            {isAdmin && <NavItem icon={<MapPinIcon />} text="Mapa y reparto" active={currentPage === 'mapa'} onClick={() => handleNavItemClick('mapa')} />}
                             {isAdmin && <NavItem icon={<MapPinIcon />} text="Zonas" active={currentPage === 'zonas'} onClick={() => handleNavItemClick('zonas')} />}
 
                             {/* Grupo Administración colapsable — solo admin */}
@@ -956,7 +959,7 @@
                             <button aria-label="Abrir navegación" onClick={() => setIsSidebarOpen(true)} className="md:hidden text-gray-600">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
                             </button>
-                            <p className="text-sm text-gray-500">Administración <span className="mx-2 text-gray-300">/</span><span className="font-semibold text-gray-800">{{ dashboard: 'Resumen', pedidos: 'Pedidos', reportes: 'Reportes', productos: 'Productos', categorias: 'Categorías', clientes: 'Clientes', zonas: 'Zonas', usuarios: 'Usuarios', actividad: 'Actividad', integridad: 'Integridad' }[currentPage] || currentPage}</span></p>
+                            <p className="text-sm text-gray-500">Administración <span className="mx-2 text-gray-300">/</span><span className="font-semibold text-gray-800">{{ mapa: 'Mapa y reparto', dashboard: 'Resumen', pedidos: 'Pedidos', reportes: 'Reportes', productos: 'Productos', categorias: 'Categorías', clientes: 'Clientes', zonas: 'Zonas', usuarios: 'Usuarios', actividad: 'Actividad', integridad: 'Integridad' }[currentPage] || currentPage}</span></p>
                             <span className="hidden sm:block text-xs text-gray-500">{user.nombre} · <span className="capitalize">{user.rol}</span></span>
                         </header>
                         

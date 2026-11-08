@@ -89,97 +89,11 @@ const PedidosView = ({ onSelectPedido, user }) => {
             }
 
             setHojaRutaData(data);
-            // Esperar a que el DOM renderice el printable div
-            setTimeout(() => {
-                const printArea = document.getElementById('printableHojaRuta');
-                if (printArea) {
-                    printArea.style.display = 'block';
-                    window.print();
-                    printArea.style.display = 'none';
-                }
-                setPrintingHojaRuta(false);
-            }, 200);
+            setPrintingHojaRuta(false);
         } catch (error) {
             alert('Error: ' + error.message);
             setPrintingHojaRuta(false);
         }
-    };
-
-    const HojaRutaPrintable = ({ data }) => {
-        if (!data || data.length === 0) return null;
-        const fechaHoy = new Date().toLocaleDateString('es-AR');
-        const localidades = [...new Set(data.map(p => p.zona_operativa || p.localidad).filter(Boolean))].join(', ');
-
-        return (
-            <div id="printableHojaRuta" className="printable-area hidden font-sans bg-white" style={{ fontSize: '10pt', color: '#444' }}>
-                {/* Cabecera */}
-                <div className="print-header">
-                    <div className="flex justify-between items-start text-sm mb-1">
-                        <div className="w-1/3"><h1 className="text-base font-bold">Hoja de Ruta</h1></div>
-                        <div className="w-1/3 text-center"><span>Fecha: {fechaHoy}</span></div>
-                        <div className="w-1/3 text-right"><span>Pedidos: {data.length}</span></div>
-                    </div>
-                    <p className="text-xs">Pedidos facturados en las últimas 6 horas que continúan en estado facturado.</p>
-                    {localidades && <p className="text-xs mb-1">Destinos: {localidades}</p>}
-                    <hr className="border-gray-400 my-1" />
-                </div>
-
-                {/* Tabla */}
-                <div className="print-body flex-grow">
-                    <table className="w-full border-collapse" style={{ fontSize: '10pt' }}>
-                        <thead>
-                            <tr>
-                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '28%' }}>Cliente</th>
-                                <th className="border-b border-gray-400 p-1 text-center">Monto</th>
-                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '12%' }}>Efectivo</th>
-                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '12%' }}>Transferencia</th>
-                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '12%' }}>Debe</th>
-                                <th className="border-b border-gray-400 p-1 text-center" style={{ width: '18%' }}>Firma Conform.</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data.map((pedido, idx) => (
-                                <React.Fragment key={pedido.id}>
-                                    {/* Fila del cliente - compacta */}
-                                    <tr>
-                                        <td className="border-b border-gray-200 px-1 py-0.5 text-left">
-                                            <span>{pedido.nombre_comercio}</span>
-                                            {pedido.zona_operativa && <div style={{fontSize:"9pt"}}>{pedido.zona_operativa}</div>}
-                                            <span style={{ fontSize: '9pt', color: '#888', marginLeft: '4px' }}>#{pedido.id}</span>
-                                            {formatCustomerSchedule(pedido.horario_atencion) && <div style={{fontSize:'9pt'}}>Atención: {formatCustomerSchedule(pedido.horario_atencion)}</div>}
-                                            {formatCustomerSchedule(pedido.horario_entrega || pedido.horario_recepcion) && <div style={{fontSize:'9pt'}}>Recepción: {formatCustomerSchedule(pedido.horario_entrega || pedido.horario_recepcion)}</div>}
-                                        </td>
-                                        <td className="border-b border-gray-200 px-1 py-0.5 text-right">{Number(pedido.monto_total).toLocaleString("es-AR", {style:"currency",currency:"ARS"})}</td>
-                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
-                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
-                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
-                                        <td className="border-b border-gray-200 px-1 py-0.5"></td>
-                                    </tr>
-                                    {/* Fila de observaciones */}
-                                    <tr>
-                                        <td colSpan="6" className="border-b border-gray-300 px-1" style={{ fontSize: '9pt', fontStyle: 'italic', paddingTop: '1px', paddingBottom: '3px', color: '#999' }}>
-                                            Obs: ________________________________________
-                                        </td>
-                                    </tr>
-                                </React.Fragment>
-                            ))}
-                            {/* Fila TOTAL */}
-                            <tr>
-                                <td className="border-b border-gray-400 px-1 py-1 font-bold text-center">TOTAL</td>
-                                <td className="text-right font-bold">{data.reduce((sum, row) => sum + Number(row.monto_total || 0), 0).toLocaleString("es-AR", {style:"currency",currency:"ARS"})}</td>
-                                <td className="border-b border-gray-400 px-1 py-1"></td>
-                                <td className="border-b border-gray-400 px-1 py-1"></td>
-                                <td className="border-b border-gray-400 px-1 py-1"></td>
-                                <td className="border-b border-gray-400 px-1 py-1 text-center" style={{ paddingTop: '12px' }}>
-                                    <div className="border-b border-gray-500 mx-2 mb-0.5"></div>
-                                    <span style={{ fontSize: '9pt', color: '#888' }}>Firma del Repartidor</span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        );
     };
 
     const inicioPeriodo = new Date();
@@ -326,7 +240,7 @@ const PedidosView = ({ onSelectPedido, user }) => {
                 <button className="border rounded-lg px-3 py-2" disabled={paginaActual === ultimaPagina} onClick={() => setPagina(paginaActual + 1)}>Siguiente</button>
             </div>}
             {!loading && filteredPedidos.length === 0 && <p className="p-6 text-center text-gray-500">No se encontraron resultados.</p>}
-            <HojaRutaPrintable data={hojaRutaData} />
+            {hojaRutaData && <DialogFrame label="Planificar reparto" onClose={() => setHojaRutaData(null)}><div className="bg-white rounded-xl w-full max-w-6xl max-h-[95vh] overflow-auto p-4"><button className="border rounded px-3 py-2 mb-3" onClick={() => setHojaRutaData(null)}>Cerrar</button><DeliveryPlanner orders={hojaRutaData} /></div></DialogFrame>}
         </div>
     );
 };
