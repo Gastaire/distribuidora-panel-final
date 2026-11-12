@@ -165,6 +165,9 @@
             const [isEditing, setIsEditing] = React.useState(false);
             const [pricePassword, setPricePassword] = React.useState('');
             const [confirmPrices, setConfirmPrices] = React.useState(false);
+            const [orderClients, setOrderClients] = React.useState([]);
+            const [selectedOrderClient, setSelectedOrderClient] = React.useState('');
+            const [clientLoadError, setClientLoadError] = React.useState('');
             const [editableItems, setEditableItems] = React.useState([]);
             const [allProducts, setAllProducts] = React.useState([]);
             const [productSearch, setProductSearch] = React.useState('');
@@ -191,6 +194,7 @@
                     const allProductsData = await productsRes.json();
                     
                     setPedido(pedidoData);
+                    setSelectedOrderClient(String(pedidoData.cliente_id));
                     setEditableItems(pedidoData.items);
                     setAllProducts(allProductsData);
                     setNotasEditables(pedidoData.notas_entrega || '');
@@ -283,7 +287,7 @@
             const handleSaveChanges = async () => {
                 const itemsToSave = editableItems.map(item => ({ producto_id: item.producto_id, cantidad: item.cantidad, ...(pricePassword ? { precio_congelado: item.precio_congelado } : {}) })).filter(item => item.cantidad > 0);
                 try {
-                    const response = await fetch(`${API_URL}/pedidos/${pedidoId}/items`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ items: itemsToSave, ...(pricePassword ? { password: pricePassword } : {}) }) });
+                    const response = await fetch(`${API_URL}/pedidos/${pedidoId}/items`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify({ items: itemsToSave, ...(pricePassword ? { password: pricePassword, ...(selectedOrderClient !== String(pedido.cliente_id) ? {cliente_id: Number(selectedOrderClient)} : {}) } : {}) }) });
                     if (!response.ok) throw new Error((await response.json()).message || 'Error al guardar los cambios.');
                     setPricePassword('');
                     setIsEditing(false);
@@ -384,7 +388,18 @@
                                     <div className="flex justify-between items-center mb-2"><h3 className="font-bold text-gray-800">Items del Pedido</h3>{isAdmin && !isEditing && (<button onClick={() => { setPricePassword(''); setIsEditing(true); }} className="bg-blue-100 text-blue-800 text-xs font-bold py-1 px-3 rounded-full">Editar Pedido</button>)}</div>
                                     
                                     {isAdmin && isEditing && !pricePassword && <button className="border rounded px-3 py-2 mb-3" onClick={() => setConfirmPrices(true)}>Editar precios</button>}
-                                    {confirmPrices && <PasswordConfirmModal title="Autorizar precios del pedido" message="Confirmá tu contraseña. Los importes se aplican solo a este pedido." onClose={() => setConfirmPrices(false)} onConfirm={password => { setPricePassword(password); setConfirmPrices(false); }} />}
+                                    {confirmPrices && <PasswordConfirmModal title="Autorizar precios y cliente" message="Confirmá tu contraseña para editar los precios o el cliente de este pedido." onClose={() => setConfirmPrices(false)} onConfirm={async password => {
+                                        setPricePassword(password); setConfirmPrices(false); setClientLoadError('');
+                                        try {
+                                            const response = await fetch(`${API_URL}/clientes`, {headers:{Authorization:`Bearer ${token}`}});
+                                            if (!response.ok) throw new Error('No se pudieron cargar los clientes. Cerrá la edición y volvé a intentar.');
+                                            setOrderClients(await response.json());
+                                        } catch (err) {setClientLoadError(err.message);}
+                                    }} />}
+                                    {isEditing && pricePassword && <div className="border rounded p-3 mb-3"><label className="block font-semibold" htmlFor="order-client">Cliente del pedido</label><select id="order-client" className="border rounded p-2 w-full" value={selectedOrderClient} onChange={e => setSelectedOrderClient(e.target.value)}>
+                                        {!orderClients.some(c => String(c.id) === String(pedido.cliente_id)) && <option value={pedido.cliente_id}>{pedido.nombre_comercio || 'Cliente actual'}</option>}
+                                        {orderClients.map(c => <option key={c.id} value={c.id}>{c.nombre_comercio} · #{c.id}</option>)}
+                                    </select><p className="text-sm text-gray-500">Se conserva el vendedor original. El cambio queda registrado en el historial.</p>{clientLoadError && <p role="alert" className="text-red-700">{clientLoadError}</p>}</div>}
                                     {isEditing && pricePassword && <div className="border rounded p-3 mb-3 space-y-2"><p>Precios particulares de este pedido</p>{editableItems.map(item => <label key={item.producto_id} className="flex justify-between gap-3"><span>{item.nombre_producto}</span><input aria-label={`Precio de ${item.nombre_producto}`} className="border rounded w-28 p-1" type="number" min="0" step="0.01" value={item.precio_congelado} onChange={event => { const value = event.target.value; setEditableItems(rows => rows.map(row => row.producto_id === item.producto_id ? {...row, precio_congelado: value} : row)); }} /></label>)}</div>}
                                     {/* --- INICIO DE LA MODIFICACIÓN RESPONSIVE --- */}
                                     {/* Vista de Tabla para Escritorio */}
@@ -849,6 +864,8 @@
             
             const renderContent = () => {
                 switch (currentPage) {
+                    case 'rescates':
+                        return isAdmin ? <RescatesView onSelectPedido={onShowPedido} /> : null;
                     case 'pedidos': 
                         return <PedidosView onSelectPedido={onShowPedido} user={user} />;
                     case 'productos': 
@@ -911,6 +928,7 @@
                             <p className="nav-caption">ESPACIO DE TRABAJO</p>
                             <NavItem icon={<HomeIcon />} text="Resumen" active={currentPage === 'dashboard'} onClick={() => handleNavItemClick('dashboard')} />
                             <NavItem icon={<ShoppingCartIcon />} text="Pedidos" active={currentPage === 'pedidos'} onClick={() => handleNavItemClick('pedidos')} />
+                            {isAdmin && <NavItem icon={<ActivityIcon />} text="Pedidos rescatados" active={currentPage === 'rescates'} onClick={() => handleNavItemClick('rescates')} />}
                             {isAdmin && <NavItem icon={<ChartBarIcon />} text="Reportes" active={currentPage === 'reportes'} onClick={() => handleNavItemClick('reportes')} />}
                             <NavItem icon={<PackageIcon />} text="Productos" active={currentPage === 'productos'} onClick={() => handleNavItemClick('productos')} />
                             {isAdmin && <NavItem icon={<TagIcon />} text="Categorías" active={currentPage === 'categorias'} onClick={() => handleNavItemClick('categorias')} />}
